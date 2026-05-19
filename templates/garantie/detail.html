@@ -1,0 +1,275 @@
+{% extends "base.html" %}
+
+{% block title %}Détail — {{ process }}{% endblock %}
+
+{% block content %}
+<style>
+  .table-scroll { max-height: 350px; overflow-y: auto; border: 1px solid #e0e0e0; border-radius: 4px; }
+  .detail-table { table-layout: fixed; width: 100%; border-collapse: collapse; }
+  .detail-table th,
+  .detail-table td { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .detail-table thead th { position: sticky; top: 0; background: #fff; z-index: 2; border-bottom: 2px solid #e0e0e0; }
+  .summary-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+  }
+  .summary-stats { font-size: 12px; color: #5f6368; display: flex; gap: 16px; flex-wrap: wrap; justify-content: flex-end; }
+  .summary-stats .stat-item { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+  .summary-stats .stat-label { font-size: 11px; color: #9aa0a6; text-transform: uppercase; letter-spacing: .3px; }
+  .summary-stats .stat-value { font-size: 13px; font-weight: 600; color: #202124; }
+  .summary-stats .stat-value.green { color: #137333; }
+  .summary-stats .stat-count { font-size: 12px; color: #5f6368; align-self: flex-end; }
+</style>
+
+<div class="page-header">
+  <a href="{% url 'garantie:dashboard' %}" style="color:#1a73e8; text-decoration:none; font-size:13px;">← Retour</a>
+  <h1 style="margin-top:8px;">{{ process.date_from }} → {{ process.date_to }}</h1>
+  <p>
+    {{ process.situations.count }} situation(s) client &nbsp;·&nbsp;
+    {{ process.transactions.count }} transaction(s) &nbsp;·&nbsp;
+    <span class="badge badge-{{ process.statut }}">{{ process.get_statut_display }}</span>
+    {% if process.reference_solidis %}
+      &nbsp;·&nbsp; <span style="color:#5f6368;">{{ process.reference_solidis }}</span>
+    {% endif %}
+  </p>
+</div>
+
+<!-- Recherche -->
+<div class="card" style="padding:14px 24px;">
+  <div style="display:flex; align-items:center; gap:12px;">
+    <span style="font-size:12px; color:#5f6368; white-space:nowrap; font-weight:500;">Rechercher</span>
+    <input type="text" id="search-input"
+           placeholder="ID Crédit ou Loan ID…"
+           style="max-width:300px;"
+           autocomplete="off">
+  </div>
+</div>
+
+<!-- Situations client -->
+<div class="card">
+  <div class="summary-bar">
+    <div style="display:flex; align-items:center; gap:10px;">
+      <div class="card-title" style="margin-bottom:0;">Situations clients à 61 jours d'arriérés</div>
+      <button class="btn btn-sm btn-outline" onclick="exportTable('table-situations','Situations','PAMF_SITUATIONS_'+PERIOD_FROM+'_'+PERIOD_TO+'.xlsx')">↓ Excel</button>
+    </div>
+    <div id="summary-situations" class="summary-stats"></div>
+  </div>
+  {% if process.situations.all %}
+  <div class="table-scroll">
+  <table id="table-situations" class="detail-table">
+    <colgroup>
+      <col style="width:20%">
+      <col style="width:10%">
+      <col style="width:18%">
+      <col style="width:22%">
+      <col style="width:14%">
+      <col style="width:16%">
+    </colgroup>
+    <thead>
+      <tr>
+        <th>ID Crédit</th>
+        <th>Loan ID</th>
+        <th>Encours</th>
+        <th>Montant appel garanti</th>
+        <th>Jours retard</th>
+        <th>Date rapport</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in process.situations.all %}
+      <tr data-idcredit="{{ s.idcredit|lower }}" data-loanid="{{ s.lo_loan_id }}">
+        <td title="{{ s.idcredit }}">{{ s.idcredit }}</td>
+        <td>{{ s.lo_loan_id }}</td>
+        <td style="text-align:right;">{{ s.encours|floatformat:2 }}</td>
+        <td style="text-align:right; font-weight:600; color:#137333;"
+            data-montant-appel="{{ s.montant_appel_garanti }}">{{ s.montant_appel_garanti|floatformat:2 }}</td>
+        <td style="text-align:right;">{{ s.days_in_arrears }}</td>
+        <td>{{ s.report_date }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  <div id="no-result-situations" style="display:none; color:#5f6368; padding:12px 0; font-size:13px;">Aucun résultat.</div>
+  {% else %}
+  <p style="color:#5f6368;">Aucune situation client pour cette période.</p>
+  {% endif %}
+</div>
+
+<!-- Transactions de remboursement -->
+<div class="card">
+  <div class="summary-bar">
+    <div style="display:flex; align-items:center; gap:10px;">
+      <div class="card-title" style="margin-bottom:0;">Relevé de remboursements</div>
+      <button class="btn btn-sm btn-outline" onclick="exportTable('table-transactions','Transactions','PAMF_TRANSACTIONS_'+PERIOD_FROM+'_'+PERIOD_TO+'.xlsx')">↓ Excel</button>
+    </div>
+    <div id="summary-transactions" class="summary-stats"></div>
+  </div>
+  {% if process.transactions.all %}
+  <div class="table-scroll">
+  <table id="table-transactions" class="detail-table">
+    <colgroup>
+      <col style="width:16%">
+      <col style="width:8%">
+      <col style="width:13%">
+      <col style="width:12%">
+      <col style="width:13%">
+      <col style="width:13%">
+      <col style="width:13%">
+      <col style="width:12%">
+    </colgroup>
+    <thead>
+      <tr>
+        <th>ID Crédit</th>
+        <th>Loan ID</th>
+        <th>Montant prêt</th>
+        <th>Encours</th>
+        <th>Montant payé</th>
+        <th>Date paiement</th>
+        <th>Date rapport</th>
+        <th>Trx ID</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for t in process.transactions.all %}
+      <tr data-idcredit="{{ t.idcredit|lower }}" data-loanid="{{ t.lo_loan_id }}">
+        <td title="{{ t.idcredit }}">{{ t.idcredit }}</td>
+        <td>{{ t.lo_loan_id }}</td>
+        <td style="text-align:right;"
+            data-montant-pret="{{ t.loan_amount_current|default:0 }}">{{ t.loan_amount_current|floatformat:2 }}</td>
+        <td style="text-align:right;"
+            data-encours="{{ t.encours|default:0 }}">{{ t.encours|floatformat:2 }}</td>
+        <td style="text-align:right; font-weight:600;"
+            data-total-paid="{{ t.total_paid }}">{{ t.total_paid|floatformat:2 }}</td>
+        <td>{{ t.repayment_date|default:"—" }}</td>
+        <td>{{ t.report_date }}</td>
+        <td style="color:#5f6368;">{{ t.trx_id|default:"—" }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  <div id="no-result-transactions" style="display:none; color:#5f6368; padding:12px 0; font-size:13px;">Aucun résultat.</div>
+  {% else %}
+  <p style="color:#5f6368;">Aucune transaction pour cette période.</p>
+  {% endif %}
+</div>
+
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script>
+var PERIOD_FROM = "{{ process.date_from }}";
+var PERIOD_TO   = "{{ process.date_to }}";
+
+function exportTable(tableId, sheetName, filename) {
+  var table = document.getElementById(tableId);
+  if (!table) return;
+
+  var headers = Array.from(table.tHead.rows[0].cells).map(function (th) {
+    return th.innerText.trim();
+  });
+
+  var rows = [];
+  Array.from(table.tBodies[0].rows).forEach(function (row) {
+    if (row.style.display === 'none') return;
+    var cells = Array.from(row.cells).map(function (td) {
+      var numAttrs = ['montantAppel', 'montantPret', 'encours', 'totalPaid'];
+      for (var i = 0; i < numAttrs.length; i++) {
+        if (td.dataset[numAttrs[i]] !== undefined) {
+          return parseFloat(td.dataset[numAttrs[i]]) || 0;
+        }
+      }
+      return td.innerText.trim();
+    });
+    rows.push(cells);
+  });
+
+  var ws = XLSX.utils.aoa_to_sheet([headers].concat(rows));
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, sheetName);
+  XLSX.writeFile(wb, filename);
+}
+
+(function () {
+  var fmt = new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format.bind(
+    new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  );
+
+  function attr(row, name) {
+    var el = row.querySelector('[data-' + name + ']');
+    return el ? (parseFloat(el.dataset[toCamel(name)]) || 0) : 0;
+  }
+
+  function toCamel(s) {
+    return s.replace(/-([a-z])/g, function (_, c) { return c.toUpperCase(); });
+  }
+
+  function stat(label, value, green) {
+    return '<div class="stat-item">'
+      + '<span class="stat-label">' + label + '</span>'
+      + '<span class="stat-value' + (green ? ' green' : '') + '">' + fmt(value) + '</span>'
+      + '</div>';
+  }
+
+  function updateSituations() {
+    var table = document.getElementById('table-situations');
+    var el    = document.getElementById('summary-situations');
+    var noRes = document.getElementById('no-result-situations');
+    if (!table || !el) return;
+
+    var rows = Array.from(table.tBodies[0].rows).filter(function (r) { return r.style.display !== 'none'; });
+    var totalAppel = rows.reduce(function (s, r) { return s + attr(r, 'montant-appel'); }, 0);
+
+    el.innerHTML = '<span class="stat-count">' + rows.length + ' ligne(s)</span>'
+      + stat('Montant appel garanti', totalAppel, true);
+
+    if (noRes) noRes.style.display = rows.length === 0 ? '' : 'none';
+  }
+
+  function updateTransactions() {
+    var table = document.getElementById('table-transactions');
+    var el    = document.getElementById('summary-transactions');
+    var noRes = document.getElementById('no-result-transactions');
+    if (!table || !el) return;
+
+    var rows = Array.from(table.tBodies[0].rows).filter(function (r) { return r.style.display !== 'none'; });
+    var totalPret    = rows.reduce(function (s, r) { return s + attr(r, 'montant-pret'); }, 0);
+    var totalEncours = rows.reduce(function (s, r) { return s + attr(r, 'encours'); }, 0);
+    var totalPaid    = rows.reduce(function (s, r) { return s + attr(r, 'total-paid'); }, 0);
+
+    el.innerHTML = '<span class="stat-count">' + rows.length + ' ligne(s)</span>'
+      + stat('Montant prêt',  totalPret,    false)
+      + stat('Encours',       totalEncours, false)
+      + stat('Montant payé',  totalPaid,    true);
+
+    if (noRes) noRes.style.display = rows.length === 0 ? '' : 'none';
+  }
+
+  function filter(q) {
+    ['table-situations', 'table-transactions'].forEach(function (id) {
+      var table = document.getElementById(id);
+      if (!table) return;
+      Array.from(table.tBodies[0].rows).forEach(function (row) {
+        var match = !q
+          || (row.dataset.idcredit || '').includes(q)
+          || (row.dataset.loanid   || '').includes(q);
+        row.style.display = match ? '' : 'none';
+      });
+    });
+    updateSituations();
+    updateTransactions();
+  }
+
+  updateSituations();
+  updateTransactions();
+
+  var input = document.getElementById('search-input');
+  if (input) {
+    input.addEventListener('input', function () {
+      filter(this.value.trim().toLowerCase());
+    });
+  }
+})();
+</script>
+{% endblock %}

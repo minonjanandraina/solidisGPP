@@ -1,0 +1,42 @@
+{% if error %}
+<tr>
+  <td colspan="8">
+    <div class="alert-error">Erreur : {{ error }}</div>
+  </td>
+</tr>
+{% elif process %}
+<script>document.getElementById('empty-row')?.remove();</script>
+<tr id="recouvrement-process-{{ process.pk }}">
+  <td>{{ process.date_from }} → {{ process.date_to }}</td>
+  <td>{{ process.date_process }}</td>
+  <td>{{ process.trx_count }}</td>
+  <td style="text-align:right;" data-remboursement="{{ process.total_remboursement }}"></td>
+  <td style="text-align:right; font-weight:700; color:#1a73e8;" data-recouvrement="{{ process.total_recouvrement }}"></td>
+  <td>
+    <span class="badge badge-{{ process.statut }}">{{ process.get_statut_display }}</span>
+  </td>
+  <td>{{ process.reference_solidis|default:"—" }}</td>
+  <td>
+    <div style="display:flex; gap:6px;">
+      <a href="{% url 'recouvrement:detail' process.pk %}" class="btn btn-sm btn-outline">Détail</a>
+      <button class="btn btn-sm btn-outline"
+              hx-get="{% url 'recouvrement:statut_form' process.pk %}"
+              hx-target="#modal-body"
+              hx-swap="innerHTML"
+              hx-on::after-request="openModal()"
+              type="button">
+        Statut
+      </button>
+      <button class="btn btn-sm btn-outline"
+              style="color:#c5221f; border-color:#f5c6c3;"
+              hx-get="{% url 'recouvrement:delete_form' process.pk %}"
+              hx-target="#modal-body"
+              hx-swap="innerHTML"
+              hx-on::after-request="openModal()"
+              type="button">
+        Supprimer
+      </button>
+    </div>
+  </td>
+</tr>
+{% endif %}

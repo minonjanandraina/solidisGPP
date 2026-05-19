@@ -1,0 +1,291 @@
+{% extends "base.html" %}
+
+{% block title %}Tableau de bord — Solidis PAMF{% endblock %}
+
+{% block content %}
+<style>
+  .db-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 24px; }
+
+  .kpi-card { margin-bottom: 0; display: flex; flex-direction: column; gap: 0; }
+
+  .kpi-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 18px;
+  }
+  .kpi-module {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    color: #9aa0a6;
+    margin-bottom: 6px;
+  }
+  .kpi-count {
+    font-size: 36px;
+    font-weight: 700;
+    color: #202124;
+    line-height: 1;
+  }
+  .kpi-count-label {
+    font-size: 12px;
+    color: #5f6368;
+    margin-top: 3px;
+  }
+
+  .kpi-sep { border: none; border-top: 1px solid #f1f3f4; margin: 14px 0; }
+
+  .kpi-row { display: flex; gap: 20px; }
+  .kpi-metric { flex: 1; }
+  .kpi-metric-label {
+    font-size: 11px;
+    color: #9aa0a6;
+    text-transform: uppercase;
+    letter-spacing: .3px;
+    margin-bottom: 4px;
+  }
+  .kpi-metric-value {
+    font-size: 16px;
+    font-weight: 700;
+    color: #202124;
+  }
+  .kpi-metric-value.green { color: #137333; }
+  .kpi-metric-value.blue  { color: #1a73e8; }
+  .kpi-metric-value.orange { color: #e37400; }
+
+  .kpi-statuts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin-top: 14px;
+  }
+
+  .recent-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #202124;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .recent-title a { font-size: 12px; font-weight: 400; color: #1a73e8; text-decoration: none; }
+  .recent-title a:hover { text-decoration: underline; }
+
+  .mini-table { font-size: 12px; }
+  .mini-table th { font-size: 11px; padding: 7px 10px; }
+  .mini-table td { padding: 7px 10px; }
+  .mini-table a { color: #1a73e8; text-decoration: none; }
+  .mini-table a:hover { text-decoration: underline; }
+
+  .empty-state { color: #9aa0a6; font-size: 13px; text-align: center; padding: 20px 0; }
+</style>
+
+<div class="page-header">
+  <h1>Tableau de bord</h1>
+  <p>Vue d'ensemble — Appels de garantie · Commissions · Recouvrements</p>
+</div>
+
+<!-- ── KPI Cards ──────────────────────────────────────────────── -->
+<div class="db-grid">
+
+  <!-- Appels de garantie -->
+  <div class="card kpi-card">
+    <div class="kpi-top">
+      <div>
+        <div class="kpi-module">Appels de garantie</div>
+        <div class="kpi-count">{{ g_count }}</div>
+        <div class="kpi-count-label">process au total</div>
+      </div>
+      <a href="{% url 'garantie:dashboard' %}" class="btn btn-sm btn-outline">Voir tout →</a>
+    </div>
+    <hr class="kpi-sep">
+    <div class="kpi-metric">
+      <div class="kpi-metric-label">Montant total appelé</div>
+      <div class="kpi-metric-value green" data-fmt="{{ g_montant }}">—</div>
+    </div>
+    {% if g_statuts %}
+    <div class="kpi-statuts">
+      {% for statut, count in g_statuts.items %}
+      <span class="badge badge-{{ statut }}">{{ count }}</span>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Commissions -->
+  <div class="card kpi-card">
+    <div class="kpi-top">
+      <div>
+        <div class="kpi-module">Commissions</div>
+        <div class="kpi-count">{{ c_count }}</div>
+        <div class="kpi-count-label">process au total</div>
+      </div>
+      <a href="{% url 'commission:dashboard' %}" class="btn btn-sm btn-outline">Voir tout →</a>
+    </div>
+    <hr class="kpi-sep">
+    <div class="kpi-row">
+      <div class="kpi-metric">
+        <div class="kpi-metric-label">Commission 1</div>
+        <div class="kpi-metric-value" data-fmt="{{ c_com1 }}">—</div>
+      </div>
+      <div class="kpi-metric">
+        <div class="kpi-metric-label">Commission 2</div>
+        <div class="kpi-metric-value" data-fmt="{{ c_com2 }}">—</div>
+      </div>
+    </div>
+    <div class="kpi-metric" style="margin-top:12px;">
+      <div class="kpi-metric-label">Total</div>
+      <div class="kpi-metric-value green" data-fmt="{{ c_total }}">—</div>
+    </div>
+    {% if c_statuts %}
+    <div class="kpi-statuts">
+      {% for statut, count in c_statuts.items %}
+      <span class="badge badge-{{ statut }}">{{ count }}</span>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Recouvrements -->
+  <div class="card kpi-card">
+    <div class="kpi-top">
+      <div>
+        <div class="kpi-module">Recouvrements</div>
+        <div class="kpi-count">{{ r_count }}</div>
+        <div class="kpi-count-label">process au total</div>
+      </div>
+      <a href="{% url 'recouvrement:dashboard' %}" class="btn btn-sm btn-outline">Voir tout →</a>
+    </div>
+    <hr class="kpi-sep">
+    <div class="kpi-metric">
+      <div class="kpi-metric-label">Total remboursé</div>
+      <div class="kpi-metric-value orange" data-fmt="{{ r_remb }}">—</div>
+    </div>
+    <div class="kpi-metric" style="margin-top:12px;">
+      <div class="kpi-metric-label">Part SOLIDIS (50 %)</div>
+      <div class="kpi-metric-value blue" data-fmt="{{ r_rec }}">—</div>
+    </div>
+    {% if r_statuts %}
+    <div class="kpi-statuts">
+      {% for statut, count in r_statuts.items %}
+      <span class="badge badge-{{ statut }}">{{ count }}</span>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+
+<!-- ── Activité récente ───────────────────────────────────────── -->
+<div class="db-grid">
+
+  <!-- Derniers appels -->
+  <div class="card" style="margin-bottom:0;">
+    <div class="recent-title">
+      Derniers appels de garantie
+      <a href="{% url 'garantie:dashboard' %}">Tout voir →</a>
+    </div>
+    {% if g_recent %}
+    <table class="mini-table">
+      <thead>
+        <tr>
+          <th>Période</th>
+          <th style="text-align:right;">Situations</th>
+          <th style="text-align:right;">Montant</th>
+          <th>Statut</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in g_recent %}
+        <tr>
+          <td><a href="{% url 'garantie:detail' p.pk %}">{{ p.date_from|date:"d/m/y" }} → {{ p.date_to|date:"d/m/y" }}</a></td>
+          <td style="text-align:right;">{{ p.nb_sit }}</td>
+          <td style="text-align:right; font-weight:600;" data-fmt="{{ p.montant }}">—</td>
+          <td><span class="badge badge-{{ p.statut }}" style="font-size:10px;">{{ p.get_statut_display }}</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state">Aucun appel lancé.</div>
+    {% endif %}
+  </div>
+
+  <!-- Dernières commissions -->
+  <div class="card" style="margin-bottom:0;">
+    <div class="recent-title">
+      Dernières commissions
+      <a href="{% url 'commission:dashboard' %}">Tout voir →</a>
+    </div>
+    {% if c_recent %}
+    <table class="mini-table">
+      <thead>
+        <tr>
+          <th>Période</th>
+          <th style="text-align:right;">Lignes</th>
+          <th style="text-align:right;">Total</th>
+          <th>Statut</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in c_recent %}
+        <tr>
+          <td><a href="{% url 'commission:detail' p.pk %}">{{ p.date_from|date:"d/m/y" }} → {{ p.date_to|date:"d/m/y" }}</a></td>
+          <td style="text-align:right;">{{ p.nb_det }}</td>
+          <td style="text-align:right; font-weight:600;" data-fmt="{{ p.total }}">—</td>
+          <td><span class="badge badge-{{ p.statut }}" style="font-size:10px;">{{ p.get_statut_display }}</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state">Aucune commission lancée.</div>
+    {% endif %}
+  </div>
+
+  <!-- Derniers recouvrements -->
+  <div class="card" style="margin-bottom:0;">
+    <div class="recent-title">
+      Derniers recouvrements
+      <a href="{% url 'recouvrement:dashboard' %}">Tout voir →</a>
+    </div>
+    {% if r_recent %}
+    <table class="mini-table">
+      <thead>
+        <tr>
+          <th>Période</th>
+          <th style="text-align:right;">Prêts</th>
+          <th style="text-align:right;">Part SOLIDIS</th>
+          <th>Statut</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in r_recent %}
+        <tr>
+          <td><a href="{% url 'recouvrement:detail' p.pk %}">{{ p.date_from|date:"d/m/y" }} → {{ p.date_to|date:"d/m/y" }}</a></td>
+          <td style="text-align:right;">{{ p.nb_trx }}</td>
+          <td style="text-align:right; font-weight:600;" data-fmt="{{ p.total_rec }}">—</td>
+          <td><span class="badge badge-{{ p.statut }}" style="font-size:10px;">{{ p.get_statut_display }}</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state">Aucun recouvrement lancé.</div>
+    {% endif %}
+  </div>
+
+</div>
+
+<script>
+(function () {
+  var fmt = new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  document.querySelectorAll('[data-fmt]').forEach(function (el) {
+    var v = parseFloat(el.dataset.fmt);
+    if (!isNaN(v)) el.textContent = fmt.format(v);
+  });
+})();
+</script>
+{% endblock %}

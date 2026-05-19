@@ -1,0 +1,16 @@
+# Ignore a single specific file
+secrets.txt
+
+# Ignore all files ending with .log
+*.log
+
+# Ignore an entire folder and everything inside it (note the trailing slash)
+node_modules/
+dist/
+
+# Exception: Ignore all .json files, EXCEPT config.json
+*.json
+!config.json
+
+#ignore venv    
+venv/

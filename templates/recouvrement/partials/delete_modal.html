@@ -1,0 +1,31 @@
+<div class="modal-header">
+  <h3>Supprimer ce process</h3>
+  <button class="modal-close" type="button" onclick="closeModal()">&#215;</button>
+</div>
+
+<p style="color:#5f6368; font-size:13px; margin-bottom:8px;">
+  Période : <strong>{{ process.date_from }} → {{ process.date_to }}</strong>
+</p>
+<p style="color:#c5221f; font-size:13px; margin-bottom:20px;">
+  Cette action est irréversible. Toutes les transactions de recouvrement associées seront supprimées.
+</p>
+
+{% if error %}
+<div class="alert-error" style="margin-bottom:16px;">{{ error }}</div>
+{% endif %}
+
+<form hx-post="{% url 'recouvrement:delete' process.pk %}"
+      hx-target="#recouvrement-process-{{ process.pk }}"
+      hx-swap="outerHTML">
+  {% csrf_token %}
+
+  <div class="modal-field">
+    <label>Mot de passe de confirmation</label>
+    <input type="password" name="password" placeholder="Entrez le mot de passe" autofocus>
+  </div>
+
+  <div class="modal-actions">
+    <button type="button" class="btn btn-outline" onclick="closeModal()">Annuler</button>
+    <button type="submit" class="btn btn-primary" style="background:#c5221f; border-color:#c5221f;">Supprimer</button>
+  </div>
+</form>

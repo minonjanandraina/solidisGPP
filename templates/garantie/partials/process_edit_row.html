@@ -1,0 +1,29 @@
+<tr id="process-{{ process.pk }}">
+  <td colspan="7" style="background:#f8f9fa; padding: 10px 12px;">
+    <form hx-post="{% url 'garantie:update_statut' process.pk %}"
+          hx-target="#process-{{ process.pk }}"
+          hx-swap="outerHTML"
+          style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+      {% csrf_token %}
+      <span style="color:#5f6368; font-size:12px; white-space:nowrap;">
+        {{ process.date_from }} → {{ process.date_to }}
+      </span>
+      <select name="statut" style="border:1px solid #dadce0; border-radius:4px; padding:6px 10px; font-size:13px;">
+        {% for val, label in process.Statut.choices %}
+          <option value="{{ val }}" {% if val == process.statut %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      <input type="text" name="reference_solidis"
+             placeholder="Réf. SOLIDIS"
+             value="{{ process.reference_solidis|default:'' }}"
+             style="border:1px solid #dadce0; border-radius:4px; padding:6px 10px; font-size:13px; width:180px;">
+      <button type="submit" class="btn btn-sm btn-primary">Enregistrer</button>
+      <button type="button" class="btn btn-sm btn-outline"
+              hx-get="{% url 'garantie:process_row' process.pk %}"
+              hx-target="#process-{{ process.pk }}"
+              hx-swap="outerHTML">
+        Annuler
+      </button>
+    </form>
+  </td>
+</tr>

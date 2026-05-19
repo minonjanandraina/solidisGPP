@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+
+{% block title %}Appels de garantie{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Appels de garantie</h1>
+  <p>Gérer les appels soumis à SOLIDIS pour les prêts à 61 jours d'arriérés</p>
+</div>
+
+<!-- Formulaire lancer un appel -->
+<div class="card">
+  <div class="card-title">Lancer un nouvel appel</div>
+  <form hx-post="{% url 'garantie:lancer_appel' %}"
+        hx-target="#process-list-body"
+        hx-swap="afterbegin"
+        hx-on::before-request="document.getElementById('btn-lancer').disabled=true; document.getElementById('btn-lancer-text').textContent='Chargement…'"
+        hx-on::after-request="document.getElementById('btn-lancer').disabled=false; document.getElementById('btn-lancer-text').textContent='Lancer l\'appel'">
+    {% csrf_token %}
+    <div class="form-row">
+      <div class="form-group">
+        <label>Date début</label>
+        <input type="date" name="date_from" required>
+      </div>
+      <div class="form-group">
+        <label>Date fin</label>
+        <input type="date" name="date_to" required>
+      </div>
+      <button type="submit" id="btn-lancer" class="btn btn-primary">
+        <span id="btn-lancer-text">Lancer l'appel</span>
+      </button>
+    </div>
+  </form>
+</div>
+
+<!-- Liste des process -->
+<div class="card">
+  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+    <div class="card-title" style="margin-bottom:0;">Historique des appels</div>
+    <button class="btn btn-sm btn-outline" onclick="exportDashboard()">↓ Excel</button>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Période</th>
+        <th>Date appel</th>
+        <th>Situations</th>
+        <th>Transactions</th>
+        <th>Montant</th>
+        <th>Statut</th>
+        <th>Réf. SOLIDIS</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody id="process-list-body">
+      {% for process in process_list %}
+        {% include "garantie/partials/process_row.html" %}
+      {% empty %}
+        <tr id="empty-row">
+          <td colspan="8" style="color:#5f6368; padding: 16px 12px;">Aucun appel lancé pour le moment.</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script>
+(function () {
+  var fmt = new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  function formatMontants() {
+    document.querySelectorAll('td[data-montant]').forEach(function (td) {
+      var v = parseFloat(td.dataset.montant);
+      if (!isNaN(v)) td.textContent = fmt.format(v);
+    });
+  }
+
+  document.addEventListener('DOMContentLoaded', formatMontants);
+  document.body.addEventListener('htmx:afterSettle', formatMontants);
+})();
+
+function exportDashboard() {
+  var table = document.getElementById('process-list-body').closest('table');
+  var headers = Array.from(table.tHead.rows[0].cells)
+    .filter(function (th) { return th.innerText.trim() !== ''; })
+    .map(function (th) { return th.innerText.trim(); });
+
+  var rows = [];
+  Array.from(table.tBodies[0].rows).forEach(function (row) {
+    if (row.id === 'empty-row') return;
+    var cells = [];
+    Array.from(row.cells).forEach(function (td, i) {
+      if (i === row.cells.length - 1) return; // skip Actions
+      if (td.dataset.montant !== undefined) cells.push(parseFloat(td.dataset.montant) || 0);
+      else cells.push(td.innerText.trim());
+    });
+    rows.push(cells);
+  });
+
+  var ws = XLSX.utils.aoa_to_sheet([headers].concat(rows));
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Appels');
+  XLSX.writeFile(wb, 'PAMF_APPELS_GARANTIE.xlsx');
+}
+</script>
+{% endblock %}

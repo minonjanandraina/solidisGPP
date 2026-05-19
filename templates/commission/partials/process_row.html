@@ -1,0 +1,43 @@
+{% if error %}
+<tr>
+  <td colspan="8">
+    <div class="alert-error">Erreur : {{ error }}</div>
+  </td>
+</tr>
+{% elif process %}
+<script>document.getElementById('empty-row')?.remove();</script>
+<tr id="commission-process-{{ process.pk }}">
+  <td>{{ process.date_from }} → {{ process.date_to }}</td>
+  <td>{{ process.date_process }}</td>
+  <td>{{ process.details_count }}</td>
+  <td style="text-align:right;" data-com1="{{ process.com1_total }}"></td>
+  <td style="text-align:right; font-weight:600;" data-com2="{{ process.com2_total }}"></td>
+  <td style="text-align:right; font-weight:700; color:#1a73e8;" data-com-total="{{ process.com_total }}"></td>
+  <td>
+    <span class="badge badge-{{ process.statut }}">{{ process.get_statut_display }}</span>
+  </td>
+  <td>{{ process.reference_solidis|default:"—" }}</td>
+  <td>
+    <div style="display:flex; gap:6px;">
+      <a href="{% url 'commission:detail' process.pk %}" class="btn btn-sm btn-outline">Détail</a>
+      <button class="btn btn-sm btn-outline"
+              hx-get="{% url 'commission:statut_form' process.pk %}"
+              hx-target="#modal-body"
+              hx-swap="innerHTML"
+              hx-on::after-request="openModal()"
+              type="button">
+        Statut
+      </button>
+      <button class="btn btn-sm btn-outline"
+              style="color:#c5221f; border-color:#f5c6c3;"
+              hx-get="{% url 'commission:delete_form' process.pk %}"
+              hx-target="#modal-body"
+              hx-swap="innerHTML"
+              hx-on::after-request="openModal()"
+              type="button">
+        Supprimer
+      </button>
+    </div>
+  </td>
+</tr>
+{% endif %}

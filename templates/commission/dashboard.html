@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+
+{% block title %}Commissions{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Commissions</h1>
+  <p>Paiements de commission à SOLIDIS — 1,5 % de l'encours (entrées portefeuille + 30 jours d'arriérés)</p>
+</div>
+
+<!-- Formulaire lancer une commission -->
+<div class="card">
+  <div class="card-title">Lancer un calcul de commission</div>
+  <form hx-post="{% url 'commission:lancer' %}"
+        hx-target="#commission-list-body"
+        hx-swap="afterbegin"
+        hx-on::before-request="document.getElementById('btn-lancer').disabled=true; document.getElementById('btn-lancer-text').textContent='Chargement…'"
+        hx-on::after-request="document.getElementById('btn-lancer').disabled=false; document.getElementById('btn-lancer-text').textContent='Lancer'">
+    {% csrf_token %}
+    <div class="form-row">
+      <div class="form-group">
+        <label>Date début</label>
+        <input type="date" name="date_from" required>
+      </div>
+      <div class="form-group">
+        <label>Date fin</label>
+        <input type="date" name="date_to" required>
+      </div>
+      <button type="submit" id="btn-lancer" class="btn btn-primary">
+        <span id="btn-lancer-text">Lancer</span>
+      </button>
+    </div>
+  </form>
+</div>
+
+<!-- Liste des process -->
+<div class="card">
+  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+    <div class="card-title" style="margin-bottom:0;">Historique des commissions</div>
+    <button class="btn btn-sm btn-outline" onclick="exportDashboard()">↓ Excel</button>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Période</th>
+        <th>Date process</th>
+        <th>Lignes</th>
+        <th>Commission 1</th>
+        <th>Commission 2</th>
+        <th>Total</th>
+        <th>Statut</th>
+        <th>Réf. SOLIDIS</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody id="commission-list-body">
+      {% for process in process_list %}
+        {% include "commission/partials/process_row.html" %}
+      {% empty %}
+        <tr id="empty-row">
+          <td colspan="9" style="color:#5f6368; padding:16px 12px;">Aucun calcul lancé pour le moment.</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script>
+(function () {
+  var fmt = new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  function formatMontants() {
+    ['data-com1', 'data-com2', 'data-com-total'].forEach(function (attr) {
+      document.querySelectorAll('td[' + attr + ']').forEach(function (td) {
+        var v = parseFloat(td.getAttribute(attr));
+        if (!isNaN(v)) td.textContent = fmt.format(v);
+      });
+    });
+  }
+
+  document.addEventListener('DOMContentLoaded', formatMontants);
+  document.body.addEventListener('htmx:afterSettle', formatMontants);
+})();
+
+function exportDashboard() {
+  var table = document.getElementById('commission-list-body').closest('table');
+  var headers = Array.from(table.tHead.rows[0].cells)
+    .filter(function (th) { return th.innerText.trim() !== ''; })
+    .map(function (th) { return th.innerText.trim(); });
+
+  var rows = [];
+  Array.from(table.tBodies[0].rows).forEach(function (row) {
+    if (row.id === 'empty-row') return;
+    var cells = [];
+    Array.from(row.cells).forEach(function (td, i) {
+      if (i === row.cells.length - 1) return; // skip Actions
+      if (td.dataset.com1 !== undefined) cells.push(parseFloat(td.dataset.com1) || 0);
+      else if (td.dataset.com2 !== undefined) cells.push(parseFloat(td.dataset.com2) || 0);
+      else if (td.dataset.comTotal !== undefined) cells.push(parseFloat(td.dataset.comTotal) || 0);
+      else cells.push(td.innerText.trim());
+    });
+    rows.push(cells);
+  });
+
+  var ws = XLSX.utils.aoa_to_sheet([headers].concat(rows));
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Commissions');
+  XLSX.writeFile(wb, 'PAMF_COMMISSIONS.xlsx');
+}
+</script>
+{% endblock %}

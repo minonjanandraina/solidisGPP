@@ -1,0 +1,35 @@
+<div class="modal-header">
+  <h3>Mettre à jour le statut</h3>
+  <button class="modal-close" type="button" onclick="closeModal()">&#215;</button>
+</div>
+
+<p style="color:#5f6368; font-size:13px; margin-bottom:20px;">
+  Période : <strong>{{ process.date_from }} → {{ process.date_to }}</strong>
+</p>
+
+<form hx-post="{% url 'garantie:update_statut' process.pk %}"
+      hx-target="#process-{{ process.pk }}"
+      hx-swap="outerHTML">
+  {% csrf_token %}
+
+  <div class="modal-field">
+    <label>Statut</label>
+    <select name="statut">
+      {% for val, label in process.Statut.choices %}
+        <option value="{{ val }}" {% if val == process.statut %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <div class="modal-field">
+    <label>Référence SOLIDIS</label>
+    <input type="text" name="reference_solidis"
+           placeholder="ex: SOL-2026-001"
+           value="{{ process.reference_solidis|default:'' }}">
+  </div>
+
+  <div class="modal-actions">
+    <button type="button" class="btn btn-outline" onclick="closeModal()">Annuler</button>
+    <button type="submit" class="btn btn-primary">Enregistrer</button>
+  </div>
+</form>
