@@ -6,4 +6,5 @@ urlpatterns = [
     path('garantie/',      include('garantie.urls',     namespace='garantie')),
     path('commission/',    include('commission.urls',   namespace='commission')),
     path('recouvrement/',  include('recouvrement.urls', namespace='recouvrement')),
+    path('sortie/',        include('sortie.urls',       namespace='sortie')),
 ]

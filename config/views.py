@@ -85,6 +85,18 @@ def home_dashboard(request):
         for s in RecouvrementProcess.objects.values('statut').annotate(n=Count('id'))
     }
 
+    # ── Sorties en portefeuille ───────────────────────────────────
+    try:
+        from sortie.services import get_sorties_summary
+        _s_data   = get_sorties_summary()
+        s_count   = len(_s_data)
+        s_montant = sum(float(r.get('montant_sortie') or 0) for r in _s_data)
+        s_recent  = _s_data[-5:][::-1]
+    except Exception:
+        s_count   = 0
+        s_montant = 0.0
+        s_recent  = []
+
     return render(request, 'home/dashboard.html', {
         'g_count':   g_agg['count'],
         'g_montant': g_agg['montant_total'],
@@ -103,4 +115,8 @@ def home_dashboard(request):
         'r_rec':     r_agg['total_rec'],
         'r_statuts': r_statuts,
         'r_recent':  r_recent,
+
+        's_count':   s_count,
+        's_montant': s_montant,
+        's_recent':  s_recent,
     })

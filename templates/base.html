@@ -237,6 +237,10 @@
        class="{% if request.resolver_match.namespace == 'recouvrement' %}active{% endif %}">
       &#9632; Recouvrements
     </a>
+    <a href="{% url 'sortie:dashboard' %}"
+       class="{% if request.resolver_match.namespace == 'sortie' %}active{% endif %}">
+      &#9632; Sorties portefeuille
+    </a>
   </nav>
 </aside>
 

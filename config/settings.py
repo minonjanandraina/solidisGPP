@@ -13,6 +13,7 @@ INSTALLED_APPS = [
     "garantie",
     "commission",
     "recouvrement",
+    "sortie",
 ]
 
 MIDDLEWARE = [
@@ -41,6 +42,7 @@ WSGI_APPLICATION = "config.wsgi.application"
 
 import platform as _platform
 _driver = "ODBC Driver 17 for SQL Server" if _platform.system() == "Linux" else "ODBC Driver 13 for SQL Server"
+
 
 DATABASES = {
     "default": {

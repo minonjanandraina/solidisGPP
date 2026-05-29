@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+
+{% block title %}Sorties en portefeuille{% endblock %}
+
+{% block content %}
+<style>
+  .month-row:hover td { background: #f1f3f4; }
+  .month-row.selected td { background: #e8f0fe; color: #1a73e8; }
+  .month-row.selected td strong { color: #1a73e8; }
+  .htmx-indicator { display: none; }
+  .htmx-request .htmx-indicator { display: inline; }
+  #detail-loading { color: #9aa0a6; font-size: 13px; padding: 16px 0; text-align: center; display: none; }
+</style>
+
+<div class="page-header">
+  <h1>Sorties en portefeuille</h1>
+  <p>Prêts dont l'Encours = 0 — résumé mensuel · Cliquez sur un mois pour afficher le détail</p>
+</div>
+
+<!-- Résumé mensuel -->
+<div class="card">
+  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+    <div class="card-title" style="margin-bottom:0;">Résumé par mois</div>
+    <button class="btn btn-sm btn-outline" onclick="exportSummary()">↓ Excel</button>
+  </div>
+
+  <table id="table-summary">
+    <thead>
+      <tr>
+        <th>Mois</th>
+        <th style="text-align:right;">Nb prêts</th>
+        <th style="text-align:right;">Montant sorti</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in rows %}
+      <tr class="month-row"
+          hx-get="{% url 'sortie:detail' row.monthdate %}"
+          hx-target="#detail-section"
+          hx-swap="innerHTML"
+          hx-indicator="#detail-loading"
+          hx-on::before-request="selectRow(this)"
+          style="cursor:pointer;"
+          data-monthdate="{{ row.monthdate }}">
+        <td><strong>{{ row.monthdate }}</strong></td>
+        <td style="text-align:right;">{{ row.nb_prets }}</td>
+        <td style="text-align:right; font-weight:600;"
+            data-montant="{{ row.montant_sortie }}">—</td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="3" style="color:#5f6368; padding:16px 12px;">Aucune donnée disponible.</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- Indicateur de chargement -->
+<div id="detail-loading">Chargement…</div>
+
+<!-- Détail du mois (chargé via HTMX au clic) -->
+<div id="detail-section"></div>
+
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script>
+(function () {
+  var fmt = new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  function formatMontants() {
+    document.querySelectorAll('[data-montant]').forEach(function (el) {
+      var v = parseFloat(el.getAttribute('data-montant'));
+      if (!isNaN(v)) el.textContent = fmt.format(v);
+    });
+  }
+
+  document.addEventListener('DOMContentLoaded', formatMontants);
+  document.body.addEventListener('htmx:afterSettle', formatMontants);
+})();
+
+function selectRow(row) {
+  document.querySelectorAll('.month-row').forEach(function (r) { r.classList.remove('selected'); });
+  row.classList.add('selected');
+}
+
+function exportSummary() {
+  var table = document.getElementById('table-summary');
+  var headers = Array.from(table.tHead.rows[0].cells).map(function (th) { return th.innerText.trim(); });
+  var rows = [];
+  Array.from(table.tBodies[0].rows).forEach(function (row) {
+    var cells = Array.from(row.cells).map(function (td) {
+      if (td.dataset.montant !== undefined) return parseFloat(td.dataset.montant) || 0;
+      return td.innerText.trim();
+    });
+    rows.push(cells);
+  });
+  var ws = XLSX.utils.aoa_to_sheet([headers].concat(rows));
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Sorties');
+  XLSX.writeFile(wb, 'PAMF_SORTIES_PORTEFEUILLE.xlsx');
+}
+
+function exportDetail(monthdate) {
+  var table = document.getElementById('table-detail');
+  if (!table) return;
+  var headers = Array.from(table.tHead.rows[0].cells).map(function (th) { return th.innerText.trim(); });
+  var rows = [];
+  Array.from(table.tBodies[0].rows).forEach(function (row) {
+    var cells = Array.from(row.cells).map(function (td) {
+      if (td.dataset.montant !== undefined) return parseFloat(td.dataset.montant) || 0;
+      return td.innerText.trim();
+    });
+    rows.push(cells);
+  });
+  var ws = XLSX.utils.aoa_to_sheet([headers].concat(rows));
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Détail');
+  XLSX.writeFile(wb, 'PAMF_SORTIES_' + monthdate + '.xlsx');
+}
+</script>
+{% endblock %}

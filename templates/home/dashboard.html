@@ -84,7 +84,7 @@
 
 <div class="page-header">
   <h1>Tableau de bord</h1>
-  <p>Vue d'ensemble — Appels de garantie · Commissions · Recouvrements</p>
+  <p>Vue d'ensemble — Appels de garantie · Commissions · Recouvrements · Sorties en portefeuille</p>
 </div>
 
 <!-- ── KPI Cards ──────────────────────────────────────────────── -->
@@ -277,6 +277,46 @@
     {% endif %}
   </div>
 
+</div>
+
+<!-- ── Sorties en portefeuille ──────────────────────────────── -->
+<div class="card" style="margin-bottom:0;">
+  <div class="recent-title">
+    Sorties en portefeuille (Encours = 0)
+    <a href="{% url 'sortie:dashboard' %}">Tout voir →</a>
+  </div>
+  <div class="kpi-row" style="margin-bottom:16px;">
+    <div class="kpi-metric">
+      <div class="kpi-metric-label">Mois avec sorties</div>
+      <div class="kpi-metric-value">{{ s_count }}</div>
+    </div>
+    <div class="kpi-metric">
+      <div class="kpi-metric-label">Montant total sorti</div>
+      <div class="kpi-metric-value" style="color:#c5221f;" data-fmt="{{ s_montant }}">—</div>
+    </div>
+  </div>
+  {% if s_recent %}
+  <table class="mini-table">
+    <thead>
+      <tr>
+        <th>Mois</th>
+        <th style="text-align:right;">Nb prêts</th>
+        <th style="text-align:right;">Montant sorti</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in s_recent %}
+      <tr>
+        <td><a href="{% url 'sortie:dashboard' %}">{{ r.monthdate }}</a></td>
+        <td style="text-align:right;">{{ r.nb_prets }}</td>
+        <td style="text-align:right; font-weight:600;" data-fmt="{{ r.montant_sortie }}">—</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="empty-state">Aucune sortie en portefeuille.</div>
+  {% endif %}
 </div>
 
 <script>
