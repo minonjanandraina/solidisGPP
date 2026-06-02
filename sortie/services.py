@@ -42,7 +42,7 @@ def get_sorties_detail(monthdate: str) -> list:
     JOIN cbs.dbo.loLoan l ON l.loLoanID = r.loLoanID
     WHERE r.Encours = 0
       AND CONCAT(YEAR([reportDate]), '-', RIGHT(CONCAT('000', MONTH([reportDate])), 2)) = '{monthdate}'
-    ORDER BY r.reportDate, l.AgreementDate
+    ORDER BY r.reportDate, l.AgreementDate desc
     """.format(monthdate=monthdate.replace("'", ""))
     df = pd.read_sql(sql, _get_conx())
     return df.to_dict('records') if not df.empty else []
