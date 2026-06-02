@@ -22,7 +22,7 @@ def get_sorties_summary() -> list:
     JOIN cbs.dbo.loLoan l ON l.loLoanID = r.loLoanID
     WHERE r.Encours = 0
     GROUP BY CONCAT(YEAR([reportDate]), '-', RIGHT(CONCAT('000', MONTH([reportDate])), 2))
-    ORDER BY CONCAT(YEAR([reportDate]), '-', RIGHT(CONCAT('000', MONTH([reportDate])), 2))
+    ORDER BY CONCAT(YEAR([reportDate]), '-', RIGHT(CONCAT('000', MONTH([reportDate])), 2)) desc 
     """
     df = pd.read_sql(sql, _get_conx())
     return df.to_dict('records') if not df.empty else []
