@@ -1,3 +1,4 @@
+from django.db import connection
 from django.db.models import Count, DecimalField, Sum
 from django.db.models.functions import Coalesce
 from django.shortcuts import render
@@ -7,7 +8,45 @@ from garantie.models import ProcesseAppelDeGarantie
 from recouvrement.models import RecouvrementProcess
 
 
+def _get_encours_par():
+    sql = """
+    SELECT
+        [reportDate],
+        SUM([Encours])                                                                    AS encours_total,
+        SUM(CASE WHEN [DaysInArrears] <= 0 THEN [Encours] ELSE 0 END)                    AS encours_sain,
+        SUM(CASE WHEN [DaysInArrears] >  0 and [DaysInArrears] <=120  THEN [Encours] ELSE 0 END)                    AS par1,
+        SUM(CASE WHEN [DaysInArrears] >= 30 and [DaysInArrears] <=120 THEN [Encours] ELSE 0 END)                   AS par30,
+        SUM(CASE WHEN [DaysInArrears] >  60 and [DaysInArrears] <= 120 THEN [Encours] ELSE 0 END)                   AS par60,
+        SUM(CASE WHEN [DaysInArrears] >  0 and [DaysInArrears] <=120  THEN [Encours] ELSE 0 END)
+            / NULLIF(SUM([Encours]), 0)                                            AS par1_pct,
+        SUM(CASE WHEN [DaysInArrears] >= 30 and [DaysInArrears] <=120 THEN [Encours] ELSE 0 END)
+            / NULLIF(SUM([Encours]), 0)                                             AS par30_pct,
+        SUM(CASE WHEN [DaysInArrears] >  60   THEN [Encours] ELSE 0 END)
+            / NULLIF(SUM([Encours]), 0)                                                 AS par60_pct
+    FROM [solidis].[dbo].[Solidis_loan_update_monthly_reports]
+    WHERE [reportDate] = (
+        SELECT MAX([reportDate]) FROM [solidis].[dbo].[Solidis_loan_update_monthly_reports]
+    )
+    GROUP BY [reportDate]
+    """
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(sql)
+            row = cursor.fetchone()
+        if row is None:
+            return None
+        keys = ['report_date', 'encours_total', 'encours_sain',
+                'par1', 'par30', 'par60', 'par1_pct', 'par30_pct', 'par60_pct']
+        print(dict(zip(keys, row)))
+        return dict(zip(keys, row))
+    except Exception:
+        return None
+
+
 def home_dashboard(request):
+    # ── Encours & PAR (dernière date disponible) ───────────────────
+    encours_par = _get_encours_par()
+
     # ── Appels de garantie ─────────────────────────────────────────
     g_recent = ProcesseAppelDeGarantie.objects.annotate(
         nb_sit=Count('situations', distinct=True),
@@ -98,6 +137,8 @@ def home_dashboard(request):
         s_recent  = []
 
     return render(request, 'home/dashboard.html', {
+        'encours_par': encours_par,
+
         'g_count':   g_agg['count'],
         'g_montant': g_agg['montant_total'],
         'g_statuts': g_statuts,

@@ -80,12 +80,87 @@
   .mini-table a:hover { text-decoration: underline; }
 
   .empty-state { color: #9aa0a6; font-size: 13px; text-align: center; padding: 20px 0; }
+
+  /* ── Encours / PAR card ── */
+  .par-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr 1fr;
+    gap: 0;
+  }
+  .par-col {
+    padding: 18px 24px;
+    border-right: 1px solid #f1f3f4;
+  }
+  .par-col:last-child { border-right: none; }
+  .par-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    color: #9aa0a6;
+    margin-bottom: 8px;
+  }
+  .par-amount {
+    font-size: 22px;
+    font-weight: 700;
+    color: #202124;
+    line-height: 1.1;
+  }
+  .par-pct {
+    display: inline-block;
+    margin-top: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 10px;
+  }
+  .par-pct.orange { background: #fef0cd; color: #e37400; }
+  .par-pct.red    { background: #fce8e6; color: #c5221f; }
+  .par-pct.green  { background: #e6f4ea; color: #137333; }
+  .par-date {
+    font-size: 11px;
+    color: #9aa0a6;
+    margin-top: 6px;
+  }
 </style>
 
 <div class="page-header">
   <h1>Tableau de bord</h1>
   <p>Vue d'ensemble — Appels de garantie · Commissions · Recouvrements · Sorties en portefeuille</p>
 </div>
+
+<!-- ── Encours & PAR ──────────────────────────────────────────── -->
+{% if encours_par %}
+<div class="card" style="margin-bottom:24px; padding:0; overflow:hidden;">
+  <div class="par-grid">
+
+    <div class="par-col">
+      <div class="par-label">Encours total</div>
+      <div class="par-amount" data-fmt="{{ encours_par.encours_total }}">—</div>
+      <div class="par-date">Situation au {{ encours_par.report_date|date:"d/m/Y" }}</div>
+    </div>
+
+    <div class="par-col">
+      <div class="par-label">PAR 1 à 120 j</div>
+      <div class="par-amount" data-fmt="{{ encours_par.par1 }}">—</div>
+      <span class="par-pct orange" data-pct="{{ encours_par.par1_pct|stringformat:'.10f' }}">—</span>
+    </div>
+
+    <div class="par-col">
+      <div class="par-label">PAR 30 à 120 j</div>
+      <div class="par-amount" data-fmt="{{ encours_par.par30 }}">—</div>
+      <span class="par-pct orange" data-pct="{{ encours_par.par30_pct|stringformat:'.10f' }}">—</span>
+    </div>
+
+    <div class="par-col">
+      <div class="par-label">PAR > 60 j</div>
+      <div class="par-amount" data-fmt="{{ encours_par.par60 }}">—</div>
+      <span class="par-pct red" data-pct="{{ encours_par.par60_pct|stringformat:'.10f' }}">—</span>
+    </div>
+
+  </div>
+</div>
+{% endif %}
 
 <!-- ── KPI Cards ──────────────────────────────────────────────── -->
 <div class="db-grid">
@@ -321,10 +396,17 @@
 
 <script>
 (function () {
-  var fmt = new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  var fmt    = new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  var fmtPct = new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
   document.querySelectorAll('[data-fmt]').forEach(function (el) {
     var v = parseFloat(el.dataset.fmt);
     if (!isNaN(v)) el.textContent = fmt.format(v);
+  });
+
+  document.querySelectorAll('[data-pct]').forEach(function (el) {
+    var v = parseFloat(el.dataset.pct);
+    if (!isNaN(v)) el.textContent = fmtPct.format(v * 100) + ' %';
   });
 })();
 </script>

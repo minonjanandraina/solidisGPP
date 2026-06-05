@@ -27,6 +27,19 @@ from exchangelib import (
 from datetime import datetime
 
 
+def check_system():
+    system = platform.system()
+    available_drivers = pyodbc.drivers()
+    required_driver = "ODBC Driver 17 for SQL Server" if system == "Linux" else "SQL Server"
+
+    if required_driver not in available_drivers:
+        raise EnvironmentError(
+            f"Driver ODBC requis introuvable : '{required_driver}'\n"
+            f"Drivers disponibles : {available_drivers}"
+        )
+    print(f"System check OK — Platform: {system}, Driver: '{required_driver}'")
+
+
 def get_date(dt):
     dt_object = datetime.strptime(dt, "%Y-%m-%d")
     date_str = dt_object.strftime("%d/%m/%Y")
@@ -493,11 +506,10 @@ def main(date_from, date_to, retry=False):
 
 
 if __name__ == "__main__":
+    check_system()
     # Example usage: main('2026-02-01', '2026-02-28')
     list_of_date_from_and_date_to = [
-        ("2026-02-01", "2026-02-28"),
-        ("2026-03-01", "2026-03-31"),
-        ("2026-04-01", "2026-04-30"),
+        ("2026-05-01", "2026-05-31"),
     ]
     for start_str_date, end_str_date in list_of_date_from_and_date_to:
 
