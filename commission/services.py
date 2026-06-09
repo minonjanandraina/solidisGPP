@@ -39,7 +39,7 @@ def _get_commissions(date_from: str, date_to: str) -> pd.DataFrame:
         0 AS DaysInArrears,
         [DATOUV] AS reportDate,
         'Commission 1 - 1.5%' AS commission_type
-    FROM solidis.dbo.Solidis_initial_loan
+    FROM solidis.dbo.Solidis_initial_loan_v2
     WHERE CAST([DATOUV] AS date) BETWEEN '{dateFrom}' AND '{dateTo}'
     """.format(dateFrom=date_from, dateTo=date_to)
     return pd.read_sql(sql, _get_conx())
