@@ -1,0 +1,26 @@
+<div class="modal-header">
+  <h3>Log de traitement{% if periode_label %} — {{ periode_label }}{% endif %}</h3>
+  <button class="modal-close" type="button" onclick="closeModal()">&#215;</button>
+</div>
+
+{% if error %}
+<div class="alert-error" style="margin-bottom:16px;">{{ error }}</div>
+{% else %}
+<div style="max-height:60vh; overflow-y:auto; display:flex; flex-direction:column; gap:10px;">
+  {% for process in log_processes %}
+  <div style="border:1px solid #e8eaed; border-radius:8px; padding:10px 12px;">
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
+      <strong style="font-size:13px;">{{ process.date }}</strong>
+      <span class="badge badge-{{ process.statut }}">{{ process.get_statut_display }}</span>
+    </div>
+    <pre style="white-space:pre-wrap; word-break:break-word; font-size:12px; color:#3c4043; margin:0; font-family:ui-monospace,Consolas,monospace;">{{ process.message }}</pre>
+  </div>
+  {% empty %}
+  <p style="color:#5f6368; font-size:13px;">Aucun jour traité.</p>
+  {% endfor %}
+</div>
+{% endif %}
+
+<div class="modal-actions">
+  <button type="button" class="btn btn-outline" onclick="closeModal()">Fermer</button>
+</div>

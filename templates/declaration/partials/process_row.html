@@ -1,0 +1,23 @@
+<tr id="declaration-process-{{ process.pk }}">
+  <td>{{ process.date }}</td>
+  <td>{{ process.date_process|date:"d/m/Y H:i" }}</td>
+  <td><span class="badge badge-{{ process.statut }}">{{ process.get_statut_display }}</span></td>
+  <td style="text-align:right;">{{ process.emg_lignes }}</td>
+  <td style="text-align:right;" data-emg-encours="{{ process.emg_encours_total }}"></td>
+  <td style="text-align:right;">{{ process.f2_lignes }}</td>
+  <td style="text-align:right;">{{ process.f2_lignes_exclues }}</td>
+  <td>
+    <div style="display:flex; gap:6px;">
+      <a href="{% url 'declaration:detail' process.pk %}" class="btn btn-sm btn-outline">Détail</a>
+      <button class="btn btn-sm btn-outline"
+              style="color:#c5221f; border-color:#f5c6c3;"
+              hx-get="{% url 'declaration:delete_form' process.pk %}"
+              hx-target="#modal-body"
+              hx-swap="innerHTML"
+              hx-on::after-request="openModal()"
+              type="button">
+        Supprimer
+      </button>
+    </div>
+  </td>
+</tr>

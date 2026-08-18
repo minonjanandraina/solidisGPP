@@ -1,0 +1,42 @@
+{% if error %}
+<div class="alert-error">Erreur : {{ error }}</div>
+{% endif %}
+<div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+  <div class="card-title" style="margin-bottom:0;">Plafond EMG (dynamique)</div>
+  <div style="display:flex; align-items:center; gap:12px;">
+    <span class="config-state {% if config.f2_bloque %}suspendu{% else %}actif{% endif %}">
+      {% if config.f2_bloque %}⏸ F2 suspendu{% else %}✓ F2 actif{% endif %}
+    </span>
+    <button class="btn btn-sm btn-outline"
+            hx-get="{% url 'declaration:config_form' %}"
+            hx-target="#modal-body"
+            hx-swap="innerHTML"
+            hx-on::after-request="openModal()"
+            type="button">
+      Modifier
+    </button>
+  </div>
+</div>
+<div class="config-grid">
+  <div class="config-metric">
+    <div class="config-metric-label">Plafond EMG</div>
+    <div class="config-metric-value" data-fmt="{{ config.plafond_emg }}">—</div>
+  </div>
+  <div class="config-metric">
+    <div class="config-metric-label">Seuil de reprise ({% widthratio config.seuil_reprise_pct 1 100 %}% du plafond)</div>
+    <div class="config-metric-value" data-fmt="{{ config.seuil_reprise }}">—</div>
+  </div>
+  <div class="config-metric">
+    <div class="config-metric-label">Dernière mise à jour</div>
+    <div class="config-metric-value" style="font-size:14px; font-weight:500; color:#5f6368;">{{ config.updated_at|date:"d/m/Y H:i" }}</div>
+  </div>
+</div>
+<script>
+(function () {
+  var fmt = new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  document.querySelectorAll('#declaration-config-panel [data-fmt]').forEach(function (el) {
+    var v = parseFloat(el.dataset.fmt);
+    if (!isNaN(v)) el.textContent = fmt.format(v);
+  });
+})();
+</script>

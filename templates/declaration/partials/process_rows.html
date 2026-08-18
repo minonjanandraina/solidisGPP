@@ -1,0 +1,20 @@
+{% if error %}
+<tr>
+  <td colspan="8">
+    <div class="alert-error">Erreur : {{ error }}</div>
+  </td>
+</tr>
+{% else %}
+<script>document.getElementById('empty-row')?.remove();</script>
+{% for process in processes %}
+  {% include "declaration/partials/process_row.html" %}
+{% endfor %}
+{% if config %}
+<div id="declaration-config-panel" hx-swap-oob="true">
+  {% include "declaration/partials/config_panel.html" %}
+</div>
+{% endif %}
+{% endif %}
+<div id="modal-body" hx-swap-oob="true">
+  {% include "declaration/partials/log_modal.html" %}
+</div>

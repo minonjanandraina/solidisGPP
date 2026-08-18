@@ -82,7 +82,7 @@
     .form-row { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
     .form-group { display: flex; flex-direction: column; gap: 4px; }
     label { font-size: 12px; color: #5f6368; font-weight: 500; }
-    input[type="date"], input[type="text"], select {
+    input[type="date"], input[type="month"], input[type="text"], select {
       border: 1px solid #dadce0;
       border-radius: 4px;
       padding: 8px 12px;
@@ -90,10 +90,16 @@
       color: #202124;
       outline: none;
       width: 100%;
+      min-height: 36px;
+      background: #fff;
+      font-family: inherit;
     }
     input[type="date"]:focus,
+    input[type="month"]:focus,
     input[type="text"]:focus,
-    select:focus { border-color: #1a73e8; }
+    select:focus { border-color: #1a73e8; box-shadow: 0 0 0 3px rgba(26,115,232,.12); }
+    input[type="month"]::-webkit-calendar-picker-indicator { cursor: pointer; opacity: .6; }
+    input[type="month"]::-webkit-calendar-picker-indicator:hover { opacity: 1; }
 
     /* ── Boutons ── */
     .btn {
@@ -214,6 +220,16 @@
     .modal-close:hover { color: #202124; }
     .modal-field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
     .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 24px; }
+
+    /* ── Spinner ── */
+    .spinner {
+      width: 32px; height: 32px;
+      border: 3px solid #e8eaed;
+      border-top-color: #1a73e8;
+      border-radius: 50%;
+      animation: spin .8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
@@ -224,6 +240,10 @@
     <a href="{% url 'home' %}"
        class="{% if request.resolver_match.url_name == 'home' %}active{% endif %}">
       &#9632; Tableau de bord
+    </a>
+    <a href="{% url 'declaration:dashboard' %}"
+       class="{% if request.resolver_match.namespace == 'declaration' %}active{% endif %}">
+      &#9632; Déclaration mensuelle
     </a>
     <a href="{% url 'garantie:dashboard' %}"
        class="{% if request.resolver_match.namespace == 'garantie' %}active{% endif %}">

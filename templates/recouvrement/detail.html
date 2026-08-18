@@ -88,13 +88,13 @@
         <td title="{{ t.agreement_number|default:'—' }}">{{ t.agreement_number|default:"—" }}</td>
         <td>{{ t.agreement_date|default:"—" }}</td>
         <td style="text-align:right;"
-            data-loan-amount="{{ t.loan_amount|default:0 }}">{{ t.loan_amount|floatformat:2|default:"—" }}</td>
+            data-loan-amount="{{ t.loan_amount|default:0|stringformat:'.2f' }}">{{ t.loan_amount|floatformat:2|default:"—" }}</td>
         <td style="text-align:right;"
-            data-encours="{{ t.encours_au_moment_appel|default:0 }}">{{ t.encours_au_moment_appel|floatformat:2|default:"—" }}</td>
+            data-encours="{{ t.encours_au_moment_appel|default:0|stringformat:'.2f' }}">{{ t.encours_au_moment_appel|floatformat:2|default:"—" }}</td>
         <td style="text-align:right; font-weight:600;"
-            data-total-remb="{{ t.total_remboursement_principale }}">{{ t.total_remboursement_principale|floatformat:2 }}</td>
+            data-total-remb="{{ t.total_remboursement_principale|default:0|stringformat:'.2f' }}">{{ t.total_remboursement_principale|floatformat:2 }}</td>
         <td style="text-align:right; font-weight:700; color:#1a73e8;"
-            data-recouvrement="{{ t.recouvrement_a_reverser }}">{{ t.recouvrement_a_reverser|floatformat:2 }}</td>
+            data-recouvrement="{{ t.recouvrement_a_reverser|default:0|stringformat:'.2f' }}">{{ t.recouvrement_a_reverser|floatformat:2 }}</td>
       </tr>
       {% endfor %}
     </tbody>
@@ -121,7 +121,7 @@ function exportTable(tableId, sheetName, filename) {
     var cells = Array.from(row.cells).map(function (td) {
       var keys = ['loanAmount', 'encours', 'totalRemb', 'recouvrement'];
       for (var i = 0; i < keys.length; i++) {
-        if (td.dataset[keys[i]] !== undefined) return parseFloat(td.dataset[keys[i]]) || 0;
+        if (td.dataset[keys[i]] !== undefined) return (parseFloat(td.dataset[keys[i]]) || 0).toFixed(2);
       }
       return td.innerText.trim();
     });

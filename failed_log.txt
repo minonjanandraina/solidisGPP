@@ -1,0 +1,21 @@
+====================================================================================================
+154 2026-07-12 echec
+('01000', '[01000] [Microsoft][ODBC SQL Server Driver][DBNETLIB]ConnectionRead (recv()). (10054) (SQLGetData); [01000] [Microsoft][ODBC SQL Server Driver][DBNETLIB]Erreur réseau générale. Consultez la documentation relative à votre réseau. (11)')
+
+✅ Deleted records from Solidis_loan_update_monthly_reports where reportDate between 2026-07-25 and 2026-07-25
+
+====================================================================================================
+156 2026-07-13 echec
+This Connection is closed
+
+
+====================================================================================================
+158 2026-07-14 echec
+This Connection is closed
+
+
+====================================================================================================
+159 2026-07-15 echec
+This Connection is closed
+
+

@@ -1,0 +1,32 @@
+<div class="modal-header">
+  <h3>Supprimer ce process</h3>
+  <button class="modal-close" type="button" onclick="closeModal()">&#215;</button>
+</div>
+
+<p style="color:#5f6368; font-size:13px; margin-bottom:8px;">
+  Date : <strong>{{ process.date }}</strong>
+</p>
+<p style="color:#c5221f; font-size:13px; margin-bottom:20px;">
+  Cette action est irréversible. Elle supprime uniquement l'historique de ce lancement web
+  (les données déjà écrites dans Solidis_loan_update_monthly_reports / Solidis_f2_declared_v2 ne sont pas affectées).
+</p>
+
+{% if error %}
+<div class="alert-error" style="margin-bottom:16px;">{{ error }}</div>
+{% endif %}
+
+<form hx-post="{% url 'declaration:delete' process.pk %}"
+      hx-target="#declaration-process-{{ process.pk }}"
+      hx-swap="outerHTML">
+  {% csrf_token %}
+
+  <div class="modal-field">
+    <label>Mot de passe de confirmation</label>
+    <input type="password" name="password" placeholder="Entrez le mot de passe" autofocus>
+  </div>
+
+  <div class="modal-actions">
+    <button type="button" class="btn btn-outline" onclick="closeModal()">Annuler</button>
+    <button type="submit" class="btn btn-primary" style="background:#c5221f; border-color:#c5221f;">Supprimer</button>
+  </div>
+</form>

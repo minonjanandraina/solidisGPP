@@ -14,6 +14,7 @@ INSTALLED_APPS = [
     "commission",
     "recouvrement",
     "sortie",
+    "declaration",
 ]
 
 MIDDLEWARE = [

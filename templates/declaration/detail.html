@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+
+{% block title %}Détail Déclaration — {{ process }}{% endblock %}
+
+{% block content %}
+<style>
+  .badge-f2_bloque       { background: #fce8e6; color: #c5221f; }
+  .badge-sans_donnees,
+  .badge-sans_soumission { background: #fef0cd; color: #7a4900; }
+  .badge-echec           { background: #fce8e6; color: #c5221f; }
+
+  .table-scroll { max-height: 480px; overflow-y: auto; border: 1px solid #e0e0e0; border-radius: 4px; }
+  .detail-table { table-layout: fixed; width: 100%; border-collapse: collapse; }
+  .detail-table th,
+  .detail-table td { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .detail-table thead th { position: sticky; top: 0; background: #fff; z-index: 2; border-bottom: 2px solid #e0e0e0; }
+  .log-box {
+    background: #202124; color: #e8eaed; font-family: 'Consolas', monospace; font-size: 12px;
+    padding: 16px; border-radius: 6px; white-space: pre-wrap; max-height: 260px; overflow-y: auto;
+  }
+</style>
+
+<div class="page-header">
+  <a href="{% url 'declaration:dashboard' %}" style="color:#1a73e8; text-decoration:none; font-size:13px;">← Retour</a>
+  <h1 style="margin-top:8px;">{{ process.date }}</h1>
+  <p>
+    <span class="badge badge-{{ process.statut }}">{{ process.get_statut_display }}</span>
+    &nbsp;·&nbsp; Lancé le {{ process.date_process|date:"d/m/Y H:i" }}
+    {% if process.reference_solidis %}
+      &nbsp;·&nbsp; <span style="color:#5f6368;">{{ process.reference_solidis }}</span>
+    {% endif %}
+  </p>
+</div>
+
+<!-- KPIs -->
+<div class="db-grid" style="grid-template-columns: repeat(4, 1fr);">
+  <div class="card kpi-card" style="margin-bottom:0;">
+    <div class="config-metric-label" style="font-size:11px; color:#9aa0a6; text-transform:uppercase;">Lignes EMG</div>
+    <div style="font-size:24px; font-weight:700;">{{ process.emg_lignes }}</div>
+  </div>
+  <div class="card kpi-card" style="margin-bottom:0;">
+    <div class="config-metric-label" style="font-size:11px; color:#9aa0a6; text-transform:uppercase;">Encours EMG</div>
+    <div style="font-size:24px; font-weight:700;">{{ process.emg_encours_total|floatformat:2 }}</div>
+  </div>
+  <div class="card kpi-card" style="margin-bottom:0;">
+    <div class="config-metric-label" style="font-size:11px; color:#9aa0a6; text-transform:uppercase;">Lignes F2 déclarées / exclues</div>
+    <div style="font-size:24px; font-weight:700;">{{ process.f2_lignes }} / {{ process.f2_lignes_exclues }}</div>
+  </div>
+  <div class="card kpi-card" style="margin-bottom:0;">
+    <div class="config-metric-label" style="font-size:11px; color:#9aa0a6; text-transform:uppercase;">Statut F2 ce jour</div>
+    <div style="font-size:24px; font-weight:700;">
+      {% if process.f2_bloque %}⏸ Suspendu{% else %}✓ Actif{% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Log -->
+{% if process.message %}
+<div class="card">
+  <div class="card-title">Journal d'exécution</div>
+  <div class="log-box">{{ process.message }}</div>
+</div>
+{% endif %}
+
+<!-- EMG summary -->
+<div class="card">
+  <div class="card-title">EMG — encours par date de situation</div>
+  {% if emg_summary %}
+  <table>
+    <thead>
+      <tr>
+        <th>Date situation</th>
+        <th style="text-align:right;">Nb prêts</th>
+        <th style="text-align:right;">Encours total</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in emg_summary %}
+      <tr>
+        <td>{{ row.reportDate }}</td>
+        <td style="text-align:right;">{{ row.nb_prets }}</td>
+        <td style="text-align:right; font-weight:600;">{{ row.encours_total|floatformat:2 }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p style="color:#5f6368;">Aucune donnée EMG pour ce jour.</p>
+  {% endif %}
+</div>
+
+<!-- F2 entries -->
+<div class="card">
+  <div class="card-title">F2 — entrées en portefeuille déclarées</div>
+  {% if f2_entries %}
+  <div class="table-scroll">
+  <table class="detail-table">
+    <thead>
+      <tr>
+        <th>ID Crédit</th>
+        <th>Loan ID</th>
+        <th>Agence</th>
+        <th>Objet</th>
+        <th style="text-align:right;">Montant</th>
+        <th>Date octroi</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for e in f2_entries %}
+      <tr>
+        <td title="{{ e.idcredit }}">{{ e.idcredit }}</td>
+        <td>{{ e.lo_loan_id }}</td>
+        <td title="{{ e.agence_octroi }}">{{ e.agence_octroi }}</td>
+        <td title="{{ e.objet }}">{{ e.objet }}</td>
+        <td style="text-align:right;">{{ e.montant|floatformat:2 }}</td>
+        <td>{{ e.datouv }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <p style="color:#5f6368;">Aucune entrée F2 déclarée pour ce jour{% if process.f2_bloque %} (F2 suspendu){% endif %}.</p>
+  {% endif %}
+</div>
+{% endblock %}

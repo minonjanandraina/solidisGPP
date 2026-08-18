@@ -47,12 +47,12 @@ def get_date(dt):
 
 
 _INTERNAL = [
-    "d.ravalison@pamf.mg",
-    "n.ramiaramananjafy@pamf.mg",
-    "s.andriamparany@pamf.mg",
+    #"d.ravalison@pamf.mg",
+    #"n.ramiaramananjafy@pamf.mg",
+    #"s.andriamparany@pamf.mg",
     "m.razakasoa@pamf.mg",
-    "k.rabenja@pamf.mg",
-    "a.ralantoharivelo@pamf.mg",
+    #"k.rabenja@pamf.mg",
+    #"a.ralantoharivelo@pamf.mg",
 ]
 _ALL = [
     "gpp@solidis.org"
@@ -111,36 +111,74 @@ def send_email(
         return False
 
 
-def notify(date_from, date_to, case="success", retry=False):
-    df = get_date(date_from)
-    dt = get_date(date_to)
+_CASE_LABELS = {
+    "success":         ("OK", "#137333", "#e6f4ea"),
+    "f2_bloque":       ("F2 suspendu", "#c5221f", "#fce8e6"),
+    "no_data":         ("Aucune donnée EMG", "#7a4900", "#fef0cd"),
+    "no_submissions":  ("Aucune soumission F2", "#7a4900", "#fef0cd"),
+    "delete_failure":  ("Échec suppression", "#c5221f", "#fce8e6"),
+    None:              ("Échec", "#c5221f", "#fce8e6"),
+}
 
-    if case == "success":
-        if retry:
-            subject = (
-                f"SOLIDIS - PAMF - [RETRY] Déclaration du {df} au {dt}-rectificatif"
-            )
-        else:
-            subject = f"SOLIDIS - PAMF - Déclaration du {df} au {dt}"
-        recipients = _ALL
 
-        message = f"L’envoi des fichiers est terminé pour la période du {df} au {dt}. Veuillez trouver  les fichiers dans les dossiers correspondants."
-    elif case == "no_data":
-        recipients = _INTERNAL
-        subject = f"SOLIDIS - PAMF - [AVERTISSEMENT] Aucune donnée EMG {df} - {dt}"
-        message = f"Aucune donnée EMG à envoyer pour la période du {df} au {dt}. Aucun fichier n’a été transmis à Solidis."
-    elif case == "no_submissions":
-        recipients = _INTERNAL
-        subject = (
-            f"SOLIDIS - PAMF - [AVERTISSEMENT] Aucune soumission éligible {df} - {dt}"
-        )
-        message = f"Aucune soumission initiale éligible pour la période du {df} au {dt}. Aucun fichier F2 n’a été transmis à Solidis."
-    elif case == "delete_failure":
-        recipients = _INTERNAL
-        subject = f"SOLIDIS - PAMF - [ERREUR] Échec suppression {df} - {dt}"
-        message = f"La suppression des données existantes a échoué pour la période du {df} au {dt}. L’envoi a été annulé pour éviter les doublons."
-    else:
+def notify_summary(date_from, date_to, results, retry=False):
+    """
+    Envoie UN SEUL mail de synthèse (tableau récapitulatif par date) en fin de
+    déclaration, plutôt qu'un mail par date traitée.
+
+    results : liste de tuples (date_str, summary_dict | None) — un par date traitée,
+    summary_dict étant celui retourné par main() (None en cas d'exception).
+    """
+    if not results:
         return
+
+    df_label = get_date(date_from)
+    dt_label = get_date(date_to)
+
+    subject = f"SOLIDIS - PAMF - Synthèse déclaration du {df_label} au {dt_label}"
+    if retry:
+        subject = f"SOLIDIS - PAMF - [RETRY] {subject}"
+
+    has_issue = any((s or {}).get("case") != "success" for _, s in results)
+
+    rows_html = ""
+    for day, s in results:
+        s = s or {}
+        case = s.get("case")
+        label, color, bg = _CASE_LABELS.get(case, (case or "—", "#5f6368", "#f1f3f4"))
+        rows_html += f"""
+        <tr>
+          <td style="padding:6px 10px; border:1px solid #e0e0e0;">{day}</td>
+          <td style="padding:6px 10px; border:1px solid #e0e0e0;">
+            <span style="background:{bg}; color:{color}; padding:2px 8px; border-radius:10px; font-size:12px; font-weight:600;">{label}</span>
+          </td>
+          <td style="padding:6px 10px; border:1px solid #e0e0e0; text-align:right;">{s.get('emg_lignes', 0)}</td>
+          <td style="padding:6px 10px; border:1px solid #e0e0e0; text-align:right;">{s.get('f2_lignes', 0)}</td>
+          <td style="padding:6px 10px; border:1px solid #e0e0e0; text-align:right;">{s.get('f2_lignes_exclues', 0)}</td>
+        </tr>
+        """
+
+    table_html = f"""
+    <table style="border-collapse:collapse; font-size:13px; width:100%;">
+      <thead>
+        <tr style="background:#f1f3f4;">
+          <th style="padding:6px 10px; border:1px solid #e0e0e0; text-align:left;">Date</th>
+          <th style="padding:6px 10px; border:1px solid #e0e0e0; text-align:left;">Statut</th>
+          <th style="padding:6px 10px; border:1px solid #e0e0e0; text-align:right;">Lignes EMG</th>
+          <th style="padding:6px 10px; border:1px solid #e0e0e0; text-align:right;">Lignes F2</th>
+          <th style="padding:6px 10px; border:1px solid #e0e0e0; text-align:right;">F2 exclues</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows_html}
+      </tbody>
+    </table>
+    """
+
+    message = (
+        f"Synthèse de la déclaration du {df_label} au {dt_label} ({len(results)} date(s) traitée(s)) :"
+        f"<br/><br/>{table_html}"
+    )
 
     body = """
     <html>
@@ -158,9 +196,10 @@ def notify(date_from, date_to, case="success", retry=False):
     """.format(message=message)
 
     print(
-        "sending mail......................................................................................."
+        "sending summary mail......................................................................................."
     )
-    send_email(to_address=recipients, subject=subject, body=body)
+    send_email(to_address=_INTERNAL, subject=subject, body=body)
+    return has_issue
 
 
 def getEngine():
@@ -278,112 +317,77 @@ def get_init_submition(datefrom, dateto):
     return df
 
 
-def get_emg_monthly(datefrom, dateto):
+def get_emg_monthly(report_date):
+    """EMG d'une seule date (nous demandons désormais les EMG date par date)."""
+    #pour les prêts clôturé, l'encours (lb.PrincipalTotalCRY - lb.PrincipalPaidCRY - lb.PrincipalWoPaidCRY) =0. et pour les prêts clôturé il faut au moin déclaré une seule fois (la date de clôturé) que l'encours =0. pour que le prêt clôturé ne soit pas pris en compte dans la déclaration EMG.
+    # courrige le query dans get_emg_monthly en ce sens
     con = pyodbc.connect(
         "DRIVER={SQL Server};SERVER=172.20.24.37;DATABASE=solidis;UID=Minonja;PWD=Minonja"
     )
     sql = """
-        DECLARE @datefrom DATE = '{}';
-        DECLARE @dateto   DATE = '{}';
-        
-        -- Step 1: Generate daily dates ONLY within the requested window
-        WITH DateSeries AS (
-            -- Anchor: start at @datefrom
-            SELECT
-                l.loLoanID,
-                l.AgreementDate,
-                l.ClosingDate,
-                l.MaturityDateCurrent,
-                CAST(@datefrom AS DATE) AS reportDate        -- ← start from @datefrom
-            FROM CBS.dbo.loLoan l
-        	join [solidis].dbo.[Solidis_initial_loan_v2] il on il.LOLOANID = l.loLoanID
-            WHERE  l.AgreementDate <= @dateto                 -- ← loan must have started before window ends
-              AND ISNULL(l.ClosingDate, @dateto) >= @datefrom -- ← loan must not be closed before window starts
-        
-            UNION ALL
-            -- Recursion: add one day until @dateto (or ClosingDate if earlier)
-            SELECT
-                d.loLoanID,
-                d.AgreementDate,
-                d.ClosingDate,
-                d.MaturityDateCurrent,
-                CAST(DATEADD(day, 1, d.reportDate) AS DATE)
-            FROM DateSeries d
-            WHERE DATEADD(day, 1, d.reportDate) <= 
-                  CASE 
-                      WHEN d.ClosingDate IS NULL THEN @dateto          -- open loan: go to @dateto
-                      WHEN d.ClosingDate < @dateto THEN d.ClosingDate  -- closed before window end
-                      ELSE @dateto                                      -- closed after window end
-                  END
-        ),
-        
-        -- Step 2: Latest balance per lb.[Date] (deduplicate)
-        -- Step 2: Latest balance per lb.[Date] (deduplicate)
-        LatestBalance AS (
-            SELECT
-                lb.loLoanID,
-                lb.loLoanBalanceOndateId,
-                lb.[Date],
-                lb.DateValidTo,
-                lb.PrincipalTotalCRY,
-                lb.PrincipalPaidCRY,
-                lb.PrincipalWoPaidCRY,
-                lb.loStatus,
-                ROW_NUMBER() OVER (
-                    PARTITION BY lb.loLoanID, lb.[Date]
-                    ORDER BY CASE WHEN lb.DateValidTo IS NULL THEN 0 ELSE 1 END ASC,
-                             lb.DateValidTo DESC
-                ) AS rn
-            FROM CBS.dbo.loLoanBalanceOnDate lb
-            join [solidis].dbo.[Solidis_initial_loan_v2] il on il.LOLOANID = lb.loLoanID
-        )
-        SELECT
-            il.[ID CREDIT] as [IDCREDIT],
-        
-            CAST(il.[N° CIN] AS VARCHAR)                            AS [CIN],
-        
-            lb.PrincipalTotalCRY - lb.PrincipalPaidCRY
-                - lb.PrincipalWoPaidCRY                             AS Encours,
-        
-            CASE WHEN lb.loStatus = 13 THEN 0
-                ELSE
-                    CASE WHEN DATEDIFF(day, ds.MaturityDateCurrent, ds.reportDate) < 0
-                        THEN 0
-                        ELSE DATEDIFF(day, ds.MaturityDateCurrent, ds.reportDate)
-                    END
-            END                                                     AS DaysInArrears,
-            l.loanAmountCurrent,
-            l.AgreementDate,
-            l.ClosingDate,
-            ds.MaturityDateCurrent,
-            lb.[Date]                                               AS dateValidFrom,
-            lb.DateValidTo,
-            lb.loStatus                                             AS lostatus,
-            l.loLoanID                                              AS loLoanID,
-            ds.reportDate
-        FROM DateSeries ds
-        JOIN CBS.dbo.loLoan l  ON l.loLoanID = ds.loLoanID
-        JOIN [solidis].dbo.[Solidis_initial_loan_v2] il  ON il.[LOLOANID] = l.loLoanID
-        JOIN LatestBalance lb    ON  lb.loLoanID = ds.loLoanID  AND lb.rn = 1    
-        														AND lb.[Date] = (        -- Carry forward: find the most recent balance on or before reportDate
-        															SELECT MAX(lb2.[Date])
-        															FROM CBS.dbo.loLoanBalanceOnDate lb2
-        															WHERE lb2.loLoanID = ds.loLoanID
-        															  AND lb2.[Date] <= ds.reportDate
-        														)
-        where 
-            lb.PrincipalTotalCRY - lb.PrincipalPaidCRY - lb.PrincipalWoPaidCRY <> 0
-            OR lb.loLoanBalanceOndateId = (
-                SELECT MIN(lb3.loLoanBalanceOndateId)
-                FROM CBS.dbo.loLoanBalanceOndate lb3
-                WHERE lb3.loLoanID = ds.loLoanID
-                  AND lb3.PrincipalTotalCRY - lb3.PrincipalPaidCRY - lb3.PrincipalWoPaidCRY = 0
-            )
-        
-        ORDER BY ds.reportDate
-        OPTION (MAXRECURSION 0);
+    DECLARE @reportDate DATE = '{}';
 
-    """.format(datefrom, dateto)
+    WITH ActiveLoans AS (
+        SELECT l.loLoanID
+        FROM CBS.dbo.loLoan l
+        WHERE l.AgreementDate <= @reportDate
+          AND ISNULL(l.ClosingDate, @reportDate) >= @reportDate
+          AND EXISTS (
+              SELECT 1 FROM solidis.dbo.Solidis_f2_declared_v2 il
+              WHERE il.LOLOANID = l.loLoanID
+          )
+    ),
+    LatestBalance AS (
+        SELECT
+            lb.loLoanID,
+            lb.loLoanBalanceOndateId,
+            lb.[Date],
+            lb.DateValidTo,
+            lb.PrincipalTotalCRY,
+            lb.PrincipalPaidCRY,
+            lb.PrincipalWoPaidCRY,
+            lb.loStatus,
+            ROW_NUMBER() OVER (
+                PARTITION BY lb.loLoanID
+                ORDER BY lb.[Date] DESC,
+                         CASE WHEN lb.DateValidTo IS NULL THEN 0 ELSE 1 END,
+                         lb.DateValidTo DESC
+            ) AS rn
+        FROM CBS.dbo.loLoanBalanceOnDate lb
+        WHERE lb.[Date] <= @reportDate
+          AND EXISTS (SELECT 1 FROM ActiveLoans al WHERE al.loLoanID = lb.loLoanID)
+    )
+    SELECT
+        il.[ID CREDIT] AS [IDCREDIT],
+        CAST(il.[N° CIN] AS VARCHAR) AS [CIN],
+        lb.PrincipalTotalCRY - lb.PrincipalPaidCRY - lb.PrincipalWoPaidCRY AS Encours,
+        CASE
+            WHEN lb.loStatus = 13 THEN 0
+            ELSE CASE WHEN DATEDIFF(DAY, l.MaturityDateCurrent, @reportDate) < 0
+                      THEN 0
+                      ELSE DATEDIFF(DAY, l.MaturityDateCurrent, @reportDate)
+                 END
+        END AS DaysInArrears,
+        l.loanAmountCurrent,
+        l.AgreementDate,
+        l.ClosingDate,
+        l.MaturityDateCurrent,
+        lb.[Date] AS dateValidFrom,
+        lb.DateValidTo,
+        lb.loStatus,
+        l.loLoanID,
+        @reportDate AS reportDate
+    FROM LatestBalance lb
+    JOIN CBS.dbo.loLoan l
+        ON l.loLoanID = lb.loLoanID
+    JOIN solidis.dbo.Solidis_f2_declared_v2 il
+        ON il.LOLOANID = lb.loLoanID
+    LEFT JOIN [solidis].[dbo].[Solidis_loan_update_monthly_reports] re
+        ON re.loLoanID = il.LOLOANID AND re.Encours = 0 AND re.reportDate = @reportDate
+    WHERE lb.rn = 1
+      
+      AND re.loLoanID IS NULL and l.AgreementDate<= @reportDate;
+    """.format(report_date)
     df = pd.read_sql(sql, con)
 
     return df
@@ -438,85 +442,378 @@ def delete_Solidis_loan_update_monthly_reports(date_from, date_to):
         return False
 
 
-def main(date_from, date_to, retry=False):
+def delete_Solidis_f2_declared_v2(date_from, date_to):
+    """Supprime les F2 déjà déclarés sur la période avant réinsertion (évite les doublons en cas de re-run)."""
+    engine = getEngine()
+    try:
+        with engine.connect() as connection:
+            delete_query = """DELETE FROM [solidis].[dbo].[Solidis_f2_declared_v2]  WHERE DATE_DECLARATION BETWEEN '{}' AND '{}'""".format(
+                date_from, date_to
+            )
+            connection.execute(text(delete_query))
+            print(
+                f"✅ Deleted records from Solidis_f2_declared_v2 where DATE_DECLARATION between {date_from} and {date_to}"
+            )
+            connection.commit()
+            return True
+    except Exception as e:
+        print(f"❌ Error deleting records: {e}")
+        return False
 
-    df_init_submition = get_init_submition(date_from, date_to)
 
-    df_init_submition_to_send = generate_initial(df_init_submition, date_to)
+def ensure_declaration_tables():
+    """Crée (si besoin) les tables de configuration de la déclaration et de suivi des entrées F2."""
+    engine = getEngine()
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                """
+        IF OBJECT_ID('solidis.dbo.Solidis_declaration_config', 'U') IS NULL
+        CREATE TABLE [solidis].[dbo].[Solidis_declaration_config] (
+            [id] int IDENTITY(1,1) PRIMARY KEY,
+            [plafond_emg] decimal(18,2) NOT NULL DEFAULT 5000000000,
+            [seuil_reprise_pct] decimal(5,4) NOT NULL DEFAULT 0.80,
+            [f2_bloque] bit NOT NULL DEFAULT 0,
+            [updated_at] datetime NOT NULL DEFAULT GETDATE()
+        )
+        """
+            )
+        )
+        connection.execute(
+            text(
+                """
+        IF NOT EXISTS (SELECT 1 FROM [solidis].[dbo].[Solidis_declaration_config])
+        INSERT INTO [solidis].[dbo].[Solidis_declaration_config] (plafond_emg, seuil_reprise_pct, f2_bloque)
+        VALUES (5000000000, 0.80, 0)
+        """
+            )
+        )
+        connection.execute(
+            text(
+                """
+        IF OBJECT_ID('solidis.dbo.Solidis_f2_declared_v2', 'U') IS NULL
+        CREATE TABLE [solidis].[dbo].[Solidis_f2_declared_v2] (
+            [ID] int IDENTITY(1,1) PRIMARY KEY,
+            [LOLOANID] float NULL,
+            [REF] varchar(100) NULL,
+            [ID CREDIT] varchar(100) NULL,
+            [N° CIN] bigint NULL,
+            [DATE DE NAISSANCE] varchar(50) NULL,
+            [GENRE] varchar(20) NULL,
+            [AGENCE D'OCTROI] varchar(200) NULL,
+            [OBJET] varchar(200) NULL,
+            [CLASST] varchar(100) NULL,
+            [MONTANT] bigint NULL,
+            [DATOUV] date NULL,
+            [DATECH] date NULL,
+            [CYCLE] bigint NULL,
+            [TAUX] float NULL,
+            [DATE_DECLARATION] date NULL
+        )
+        """
+            )
+        )
+
+
+def get_declaration_config():
+    """Lit le plafond EMG, le seuil de reprise et l'état de blocage F2 courant (dynamique, éditable via le web)."""
+    ensure_declaration_tables()
+    engine = getEngine()
+    df = pd.read_sql(
+        "SELECT TOP 1 * FROM [solidis].[dbo].[Solidis_declaration_config] ORDER BY id",
+        engine,
+    )
+    row = df.iloc[0]
+    return {
+        "plafond_emg": float(row["plafond_emg"]),
+        "seuil_reprise_pct": float(row["seuil_reprise_pct"]),
+        "f2_bloque": bool(row["f2_bloque"]),
+    }
+
+
+def update_f2_bloque(new_state: bool):
+    engine = getEngine()
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "UPDATE [solidis].[dbo].[Solidis_declaration_config] "
+                "SET f2_bloque = :state, updated_at = GETDATE()"
+            ),
+            {"state": new_state},
+        )
+
+
+def get_encours_reference(date_from):
+    """Encours total (toutes lignes) à la dernière reportDate connue avant date_from — sert de référence au gating F2."""
+    engine = getEngine()
+    sql = """
+    SELECT SUM(Encours) AS encours
+    FROM [solidis].[dbo].[Solidis_loan_update_monthly_reports]
+    WHERE reportDate = (
+        SELECT MAX(reportDate)
+        FROM [solidis].[dbo].[Solidis_loan_update_monthly_reports]
+        WHERE reportDate < '{date_from}'
+    )
+    """.format(date_from=date_from)
+    df = pd.read_sql(sql, engine)
+    value = df.iloc[0]["encours"]
+    return float(value) if value is not None else None
+
+
+def build_f2_daily_states(date_from, date_to, df_emg, config):
+    """
+    Détermine, pour CHAQUE date entre date_from et date_to, si le statut est
+    'remplissage' (F2 autorisé) ou 'stop' (F2 suspendu) — hystérésis évaluée jour par
+    jour à partir de l'encours de la veille (j-1) dans Solidis_loan_update_monthly_reports :
+      - statut 'remplissage' et encours(j-1) > plafond            -> passe 'stop'
+      - statut 'stop'        et encours(j-1) <= seuil_reprise     -> passe 'remplissage'
+      - sinon le statut de la veille est conservé
+    Sans donnée d'encours pour j-1, le statut courant est conservé (pas de bascule à l'aveugle).
+
+    Retourne (states, f2_bloque_fin_periode) où states est un dict {date: bool bloqué}.
+    """
+    plafond = config["plafond_emg"]
+    seuil_reprise = plafond * config["seuil_reprise_pct"]
+    bloque = config["f2_bloque"]
+
+    encours_by_day = (
+        df_emg.assign(_day=pd.to_datetime(df_emg["reportDate"]).dt.date)
+        .groupby("_day")["Encours"].sum()
+        .to_dict()
+    )
+
+    date_from_d = pd.to_datetime(date_from).date()
+    date_to_d = pd.to_datetime(date_to).date()
+
+    encours_prev = get_encours_reference(date_from)
+
+    states = {}
+    current_day = date_from_d
+    while current_day <= date_to_d:
+        if encours_prev is not None:
+            if not bloque and encours_prev > plafond:
+                bloque = True
+            elif bloque and encours_prev <= seuil_reprise:
+                bloque = False
+        states[current_day] = bloque
+        encours_prev = encours_by_day.get(current_day)
+        current_day += timedelta(days=1)
+
+    return states, bloque
+
+
+def filter_f2_by_daily_state(df_init_submition_to_send, daily_states):
+    """Ne garde que les lignes F2 dont le DATOUV tombe un jour 'remplissage' (F2 autorisé)."""
+    df = df_init_submition_to_send.copy()
+    datouv_day = pd.to_datetime(df["DATOUV"]).dt.date
+    actif = datouv_day.map(lambda d: not daily_states.get(d, True))
+    return df[actif].reset_index(drop=True), df[~actif].reset_index(drop=True)
+
+
+def save_f2_declared(df_init_submition_to_send, date_to, engine):
+    """Enregistre les entrées F2 effectivement déclarées (même structure que Solidis_initial_loan_v2)."""
+    cols = [
+        "LOLOANID", "REF", "ID CREDIT", "N° CIN", "DATE DE NAISSANCE", "GENRE",
+        "AGENCE D'OCTROI", "OBJET", "CLASST", "MONTANT", "DATOUV", "DATECH", "CYCLE", "TAUX",
+    ]
+    df = df_init_submition_to_send.copy()
+    if "REF" not in df.columns:
+        df["REF"] = None
+    df = df[cols]
+    df["DATE_DECLARATION"] = date_to
+    df.to_sql(name="Solidis_f2_declared_v2", con=engine, if_exists="append", index=False)
+
+
+def upload_declaration_files(date_from, date_to):
+    """
+    Envoie UN SEUL fichier EMG et UN SEUL fichier F2 pour toute la période
+    [date_from, date_to] vers le SFTP SOLIDIS — au lieu d'un fichier par date traitée.
+    Relit les données déjà écrites en base par main() pour chaque jour de la période.
+    """
+    engine = getEngine()
+
+    sql_emg = """
+    SELECT [IDCREDIT], [loLoanID], [CIN], [Encours], [DaysInArrears], [reportDate]
+    FROM [solidis].[dbo].[Solidis_loan_update_monthly_reports]
+    WHERE [reportDate] BETWEEN '{}' AND '{}'
+    ORDER BY [reportDate], [loLoanID]
+    """.format(date_from, date_to)
+    df_emg = pd.read_sql(sql_emg, engine)
+
+    sql_f2 = """
+    SELECT [LOLOANID], [REF], [ID CREDIT], [N° CIN], [DATE DE NAISSANCE], [GENRE],
+           [AGENCE D'OCTROI], [OBJET], [CLASST], [MONTANT], [DATOUV], [DATECH], [CYCLE], [TAUX]
+    FROM [solidis].[dbo].[Solidis_f2_declared_v2]
+    WHERE [DATE_DECLARATION] BETWEEN '{}' AND '{}'
+    ORDER BY [DATOUV]
+    """.format(date_from, date_to)
+    df_f2 = pd.read_sql(sql_f2, engine)
+
+    fn_emg = generate_filename("PAMF_DIG EMG - monthly", date_to, "")
     fn_f2 = generate_filename("PAMF_DIG F2 - monthly", date_to, "")
 
-    df_emg = get_emg_monthly(date_from, date_to)
+    if not df_emg.empty:
+        df_emg.to_excel(fn_emg, index=False, engine="openpyxl")
+        upload_df_to_sftp(
+            df_emg,
+            remote_path="/pamf-to-solidis/GUICHET_CREDITS_DIGITAUX/ENCOURS/",
+            filename=fn_emg,
+        )
+    if not df_f2.empty:
+        df_f2.to_excel(fn_f2, index=False, engine="openpyxl")
+        upload_df_to_sftp(
+            df_f2,
+            remote_path="/pamf-to-solidis/GUICHET_CREDITS_DIGITAUX/F2/",
+            filename=fn_f2,
+        )
+
+    return df_emg, df_f2
+
+
+def main(date_from, date_to):
+
+    engine = getEngine()
+
+    config = get_declaration_config()
+
+    summary = {
+        "case": None,
+        "f2_bloque": config["f2_bloque"],
+        "emg_lignes": 0,
+        "emg_encours_total": 0,
+        "f2_lignes": 0,
+        "f2_lignes_exclues": 0,
+        "jours_f2_actifs": 0,
+        "jours_f2_bloques": 0,
+    }
+
+    df_emg = get_emg_monthly(date_to)
     df_emg = df_emg[
         ["IDCREDIT", "loLoanID", "CIN", "Encours", "DaysInArrears", "reportDate"]
     ]
     fn_emg = generate_filename("PAMF_DIG EMG - monthly", date_to, "")
 
-    engine = getEngine()
     # before sending data to sql please delete between date_from and date_to to avoid duplicates in case of re-run
-    # delete_Solidis_loan_update_monthly_reports(date_from,date_to)
-
     existing_update_deleted = delete_Solidis_loan_update_monthly_reports(
         date_from, date_to
     )
-    """
-    ┌──────────────────┬─────────────────────────────────┬─────────────────────────────────┐
-    │       case       │           Recipients            │              When               │                                                                                                                                   
-    ├──────────────────┼─────────────────────────────────┼─────────────────────────────────┤                                                                                                                                 
-    │ 'success'        │ gpp@solidis.org + internal PAMF │ Upload completed normally       │                                                                                                                                 
-    ├──────────────────┼─────────────────────────────────┼─────────────────────────────────┤
-    │ 'no_data'        │ Internal PAMF only              │ df_emg is empty                 │
-    ├──────────────────┼─────────────────────────────────┼─────────────────────────────────┤
-    │ 'no_submissions' │ Internal PAMF only              │ df_init_submition_sent is empty │
-    ├──────────────────┼─────────────────────────────────┼─────────────────────────────────┤
-    │ 'delete_failure' │ Internal PAMF only              │ Delete step returned False      │
-    └──────────────────┴─────────────────────────────────┴─────────────────────────────────┘
-    """
-    if existing_update_deleted:
-        if len(df_emg) == 0:
-            print("⚠️ No data to upload for the given date range.")
-            notify(date_from, date_to, case="no_data")
-        elif len(df_init_submition_to_send) == 0:
-            print(
-                "⚠️ No eligible initial submissions to upload for the given date range."
-            )
-            notify(date_from, date_to, case="no_submissions")
-        else:
-            df_emg = upload_df_to_sftp(
-                df_emg,
-                remote_path="/pamf-to-solidis/GUICHET_CREDITS_DIGITAUX/ENCOURS/",
-                filename=fn_emg,
-            )
-            df_init_submition_to_send = upload_df_to_sftp(
-                df_init_submition_to_send,
-                remote_path="/pamf-to-solidis/GUICHET_CREDITS_DIGITAUX/F2/",
-                filename=fn_f2,
-            )
-            df_init_submition_to_send.to_excel(fn_f2, index=False, engine="openpyxl")
-            df_emg.to_excel(fn_emg, index=False, engine="openpyxl")
-            df_emg.to_sql(
-                name="Solidis_loan_update_monthly_reports",
-                con=engine,
-                if_exists="append",
-                index=False,
-            )
-            notify(date_from, date_to, case="success", retry=retry)
-    else:
+    # Pas de mail par déclaration : le "case" est renvoyé dans summary et agrégé
+    # dans un mail de synthèse unique par notify_summary() en fin de traitement.
+    if not existing_update_deleted:
         print("❌ Skipping upload to SQL due to delete failure")
-        notify(date_from, date_to, case="delete_failure")
+        summary["case"] = "delete_failure"
+        return summary
+
+    if len(df_emg) == 0:
+        print("⚠️ No data to upload for the given date range.")
+        summary["case"] = "no_data"
+        return summary
+
+    # EMG est toujours envoyé, même si F2 est suspendu
+    df_emg.to_excel(fn_emg, index=False, engine="openpyxl")
+    df_emg.to_sql(
+        name="Solidis_loan_update_monthly_reports",
+        con=engine,
+        if_exists="append",
+        index=False,
+    )
+    summary["emg_lignes"] = int(len(df_emg))
+    summary["emg_encours_total"] = float(
+        df_emg.loc[df_emg["reportDate"] == df_emg["reportDate"].max(), "Encours"].sum()
+    )
+
+    # --- Gating F2 jour par jour sur [date_from, date_to] (encours de j-1 vs plafond/seuil de reprise) ---
+    daily_states, f2_bloque_fin = build_f2_daily_states(date_from, date_to, df_emg, config)
+    if f2_bloque_fin != config["f2_bloque"]:
+        update_f2_bloque(f2_bloque_fin)
+
+    jours_actifs = sum(1 for bloque in daily_states.values() if not bloque)
+    jours_bloques = len(daily_states) - jours_actifs
+    summary["f2_bloque"] = f2_bloque_fin
+    summary["jours_f2_actifs"] = jours_actifs
+    summary["jours_f2_bloques"] = jours_bloques
+
+    if jours_actifs == 0:
+        print(
+            f"⏸️ Déclaration F2 suspendue sur toute la période {date_from} → {date_to} "
+            f"(encours au-dessus du seuil de reprise chaque jour)."
+        )
+        summary["case"] = "f2_bloque"
+        return summary
+
+    df_init_submition = get_init_submition(date_from, date_to)
+    df_init_submition_to_send = generate_initial(df_init_submition, date_to)
+    fn_f2 = generate_filename("PAMF_DIG F2 - monthly", date_to, "")
+
+    if len(df_init_submition_to_send) == 0:
+        print(
+            "⚠️ No eligible initial submissions to upload for the given date range."
+        )
+        summary["case"] = "no_submissions"
+        return summary
+
+    df_f2_actif, df_f2_exclu = filter_f2_by_daily_state(df_init_submition_to_send, daily_states)
+    summary["f2_lignes_exclues"] = int(len(df_f2_exclu))
+
+    if len(df_f2_actif) == 0:
+        print(
+            f"⏸️ {len(df_f2_exclu)} entrée(s) F2 tombent un jour bloqué sur la période "
+            f"{date_from} → {date_to} : aucune déclaration F2 ce run."
+        )
+        summary["case"] = "f2_bloque"
+        return summary
+
+    # avant d'insérer, supprimer les F2 déjà déclarés sur la période pour éviter les doublons en cas de re-run
+    existing_f2_deleted = delete_Solidis_f2_declared_v2(date_from, date_to)
+    if not existing_f2_deleted:
+        print("❌ Skipping F2 upload to SQL due to delete failure")
+        summary["case"] = "delete_failure"
+        return summary
+
+    df_f2_actif.to_excel(fn_f2, index=False, engine="openpyxl")
+    save_f2_declared(df_f2_actif, date_to, engine)
+    summary["f2_lignes"] = int(len(df_f2_actif))
+    summary["case"] = "success"
+    if jours_bloques:
+        print(
+            f"ℹ️ {jours_bloques} jour(s) bloqué(s) sur la période : "
+            f"{len(df_f2_exclu)} entrée(s) F2 non déclarée(s) ce run."
+        )
+    return summary
 
 
 if __name__ == "__main__":
     check_system()
     # Example usage: main('2026-02-01', '2026-02-28')
     list_of_date_from_and_date_to = [
-        ("2026-05-01", "2026-05-31"),
+        ("2026-06-01", "2026-06-30"),
     ]
     for start_str_date, end_str_date in list_of_date_from_and_date_to:
 
         print("====================================================================================================")
         print(f"Processing data from {start_str_date} to {end_str_date}...")
         print("====================================================================================================")
-        main(start_str_date, end_str_date, retry=True)
+
+        # Un mail par déclaration -> un seul mail de synthèse en fin de traitement.
+        results = []
+        d = datetime.strptime(start_str_date, "%Y-%m-%d").date()
+        d_end = datetime.strptime(end_str_date, "%Y-%m-%d").date()
+        while d <= d_end:
+            d_str = d.isoformat()
+            try:
+                summary = main(d_str, d_str)
+            except Exception as exc:
+                print(f"❌ Erreur lors du traitement du {d_str} : {exc}")
+                summary = None
+            results.append((d_str, summary))
+            d += timedelta(days=1)
+
+        notify_summary(start_str_date, end_str_date, results, retry=True)
+
+        # Un seul fichier EMG + un seul fichier F2 pour toute la période vers le SFTP,
+        # plutôt qu'un fichier par date traitée.
+        upload_declaration_files(start_str_date, end_str_date)
+
         print("====================================================================================================")
         print(f"Finished processing data from {start_str_date} to {end_str_date}.")
         print("====================================================================================================")

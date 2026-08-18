@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+
+{% block title %}Déclaration mensuelle{% endblock %}
+
+{% block content %}
+<style>
+  .badge-f2_bloque       { background: #fce8e6; color: #c5221f; }
+  .badge-sans_donnees,
+  .badge-sans_soumission { background: #fef0cd; color: #7a4900; }
+  .badge-echec           { background: #fce8e6; color: #c5221f; }
+
+  .config-grid { display: flex; gap: 32px; align-items: center; flex-wrap: wrap; }
+  .config-metric { display: flex; flex-direction: column; gap: 4px; }
+  .config-metric-label { font-size: 11px; color: #9aa0a6; text-transform: uppercase; letter-spacing: .3px; }
+  .config-metric-value { font-size: 18px; font-weight: 700; color: #202124; }
+  .config-state {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 14px; border-radius: 16px; font-size: 13px; font-weight: 600;
+  }
+  .config-state.actif    { background: #e6f4ea; color: #137333; }
+  .config-state.suspendu { background: #fce8e6; color: #c5221f; }
+</style>
+
+<div class="page-header">
+  <h1>Déclaration mensuelle</h1>
+  <p>F2 (entrées portefeuille) + EMG (encours mensuel de garantie) — équivalent web de ETL_Solidis_monthly.py</p>
+</div>
+
+<!-- Configuration du plafond EMG -->
+<div class="card" id="declaration-config-panel">
+  {% include "declaration/partials/config_panel.html" %}
+</div>
+
+<!-- Formulaire lancer une déclaration -->
+<div class="card">
+  <div class="card-title">Lancer une déclaration</div>
+  <p style="color:#5f6368; font-size:12px; margin-bottom:12px;">
+    Une déclaration (extraction + EMG + F2) est lancée pour chaque jour de la période, l'un après l'autre.
+  </p>
+  <form hx-post="{% url 'declaration:lancer' %}"
+        hx-target="#declaration-list-body"
+        hx-swap="afterbegin"
+        hx-on::before-request="startDeclaration(this)"
+        hx-on::after-request="document.getElementById('btn-lancer').disabled=false; document.getElementById('btn-lancer-text').textContent='Lancer'">
+    {% csrf_token %}
+    <div class="form-row">
+      <div class="form-group">
+        <label>Mois</label>
+        <input type="month" name="mois" id="mois-input" required>
+      </div>
+      <button type="submit" id="btn-lancer" class="btn btn-primary">
+        <span id="btn-lancer-text">Lancer</span>
+      </button>
+    </div>
+  </form>
+</div>
+
+<!-- Historique -->
+<div class="card">
+  <div class="card-title">Historique des déclarations</div>
+  <table>
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Date process</th>
+        <th>Statut</th>
+        <th style="text-align:right;">Lignes EMG</th>
+        <th style="text-align:right;">Encours EMG</th>
+        <th style="text-align:right;">Lignes F2</th>
+        <th style="text-align:right;">Lignes F2 exclues</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody id="declaration-list-body">
+      {% for process in process_list %}
+        {% include "declaration/partials/process_row.html" %}
+      {% empty %}
+        <tr id="empty-row">
+          <td colspan="8" style="color:#5f6368; padding:16px 12px;">Aucune déclaration lancée pour le moment.</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<script>
+function startDeclaration(form) {
+  document.getElementById('btn-lancer').disabled = true;
+  document.getElementById('btn-lancer-text').textContent = 'Traitement…';
+
+  var moisVal = document.getElementById('mois-input').value; // "YYYY-MM"
+  var label = moisVal;
+  if (moisVal) {
+    var parts = moisVal.split('-');
+    var d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, 1);
+    label = d.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+  }
+
+  document.getElementById('modal-body').innerHTML =
+    '<div class="modal-header"><h3>Traitement en cours</h3></div>' +
+    '<div style="display:flex; flex-direction:column; align-items:center; gap:14px; padding:28px 0;">' +
+      '<div class="spinner"></div>' +
+      '<p style="color:#5f6368; font-size:13px; text-align:center; margin:0;">' +
+        'Traitement du mois de <strong>' + label + '</strong> en cours&hellip;<br>' +
+        'Extraction, calcul EMG/F2 jour par jour, envoi SFTP.' +
+      '</p>' +
+    '</div>';
+  openModal();
+}
+
+(function () {
+  var fmt = new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  function formatMontants() {
+    ['data-emg-encours'].forEach(function (attr) {
+      document.querySelectorAll('td[' + attr + ']').forEach(function (td) {
+        var v = parseFloat(td.getAttribute(attr));
+        if (!isNaN(v)) td.textContent = fmt.format(v);
+      });
+    });
+  }
+
+  document.addEventListener('DOMContentLoaded', formatMontants);
+  document.body.addEventListener('htmx:afterSettle', formatMontants);
+})();
+</script>
+{% endblock %}
