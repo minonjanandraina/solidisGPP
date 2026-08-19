@@ -383,7 +383,7 @@ def get_emg_monthly(report_date):
     JOIN solidis.dbo.Solidis_f2_declared_v2 il
         ON il.LOLOANID = lb.loLoanID
     LEFT JOIN [solidis].[dbo].[Solidis_loan_update_monthly_reports] re
-        ON re.loLoanID = il.LOLOANID AND re.Encours = 0 AND re.reportDate = @reportDate
+        ON re.loLoanID = il.LOLOANID AND re.Encours = 0 
     WHERE lb.rn = 1
       
       AND re.loLoanID IS NULL and l.AgreementDate<= @reportDate;
