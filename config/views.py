@@ -286,7 +286,6 @@ def dash_sorties(request):
 
 
 @require_GET
-@cache_page(PARTIAL_CACHE_SECONDS)
 def dash_bilan(request):
     # Flux entrants pour PAMF : appel de garantie (SOLIDIS paie PAMF = Encours * 0.5)
     # Flux sortants pour PAMF : commissions (1.5% Encours) + part SOLIDIS sur recouvrement (50%)

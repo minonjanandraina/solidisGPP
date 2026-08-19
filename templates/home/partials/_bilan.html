@@ -1,5 +1,5 @@
 <div class="card" style="margin-bottom:24px; padding:0;">
-  <div class="bilan-grid">
+  <div class="bilan-grid bilan-col-hover">
 
     <div class="bilan-col">
       <div class="bilan-label">Reçu de SOLIDIS</div>
@@ -13,41 +13,41 @@
       <div class="bilan-sub">Commissions (1,5 %) + part SOLIDIS sur recouvrement (50 %)</div>
     </div>
 
-    <div class="bilan-col bilan-col-hover">
+    <div class="bilan-col">
       <div class="bilan-label">Solde net PAMF</div>
       <div class="bilan-amount {% if pamf_solde >= 0 %}green{% else %}red{% endif %}">{{ pamf_solde_fmt }}</div>
       <span class="bilan-tag {% if pamf_solde >= 0 %}green{% else %}red{% endif %}">
         {% if pamf_solde >= 0 %}▲ PAMF gagne{% else %}▼ PAMF perd{% endif %}
       </span>
+    </div>
 
-      <div class="solde-popover">
-        <div class="solde-popover-card">
-          <div class="solde-popover-title">Évolution mensuelle — Solde net PAMF</div>
-          {% if solde_evolution %}
-          <table class="mini-table">
-            <thead>
-              <tr>
-                <th>Mois</th>
-                <th style="text-align:right;">Reçu</th>
-                <th style="text-align:right;">Payé</th>
-                <th style="text-align:right;">Solde</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for m in solde_evolution %}
-              <tr>
-                <td>{{ m.label }}</td>
-                <td style="text-align:right;">{{ m.recu_fmt }}</td>
-                <td style="text-align:right;">{{ m.paye_fmt }}</td>
-                <td style="text-align:right; font-weight:600;" class="{% if m.solde_positive %}solde-pos{% else %}solde-neg{% endif %}">{{ m.solde_fmt }}</td>
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-          {% else %}
-          <div class="empty-state">Aucune donnée.</div>
-          {% endif %}
-        </div>
+    <div class="solde-popover">
+      <div class="solde-popover-card">
+        <div class="solde-popover-title">Évolution mensuelle — Solde net PAMF</div>
+        {% if solde_evolution %}
+        <table class="mini-table">
+          <thead>
+            <tr>
+              <th>Mois</th>
+              <th style="text-align:right;">Reçu</th>
+              <th style="text-align:right;">Payé</th>
+              <th style="text-align:right;">Solde</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for m in solde_evolution %}
+            <tr>
+              <td>{{ m.label }}</td>
+              <td style="text-align:right;">{{ m.recu_fmt }}</td>
+              <td style="text-align:right;">{{ m.paye_fmt }}</td>
+              <td style="text-align:right; font-weight:600;" class="{% if m.solde_positive %}solde-pos{% else %}solde-neg{% endif %}">{{ m.solde_fmt }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <div class="empty-state">Aucune donnée.</div>
+        {% endif %}
       </div>
     </div>
 
