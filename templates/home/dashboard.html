@@ -122,6 +122,56 @@
     color: #9aa0a6;
     margin-top: 6px;
   }
+
+  /* ── Bilan PAMF ↔ SOLIDIS ── */
+  .bilan-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1.2fr;
+    gap: 0;
+  }
+  .bilan-col {
+    padding: 18px 24px;
+    border-right: 1px solid #f1f3f4;
+  }
+  .bilan-col:last-child { border-right: none; }
+  .bilan-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    color: #9aa0a6;
+    margin-bottom: 8px;
+  }
+  .bilan-amount {
+    font-size: 24px;
+    font-weight: 700;
+    line-height: 1.1;
+  }
+  .bilan-amount.green { color: #137333; }
+  .bilan-amount.red   { color: #c5221f; }
+  .bilan-sub {
+    font-size: 11px;
+    color: #9aa0a6;
+    margin-top: 6px;
+  }
+  .bilan-tag {
+    display: inline-block;
+    margin-top: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 10px;
+  }
+  .bilan-tag.green { background: #e6f4ea; color: #137333; }
+  .bilan-tag.red    { background: #fce8e6; color: #c5221f; }
+
+  /* ── Squelette de chargement ── */
+  @keyframes skel-pulse { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
+  .skel-bar {
+    background: #eef0f2;
+    border-radius: 4px;
+    animation: skel-pulse 1.3s ease-in-out infinite;
+  }
 </style>
 
 <div class="page-header">
@@ -129,285 +179,78 @@
   <p>Vue d'ensemble — Appels de garantie · Commissions · Recouvrements · Sorties en portefeuille</p>
 </div>
 
-<!-- ── Encours & PAR ──────────────────────────────────────────── -->
-{% if encours_par %}
-<div class="card" style="margin-bottom:24px; padding:0; overflow:hidden;">
-  <div class="par-grid">
-
-    <div class="par-col">
-      <div class="par-label">Encours total</div>
-      <div class="par-amount" data-fmt="{{ encours_par.encours_total }}">—</div>
-      <div class="par-date">Situation au {{ encours_par.report_date|date:"d/m/Y" }}</div>
+<!-- ── Encours & PAR (chargement différé) ────────────────────── -->
+<div id="encours-par-slot" hx-get="{% url 'dash_encours_par' %}" hx-trigger="load" hx-swap="outerHTML">
+  <div class="card" style="margin-bottom:24px; padding:0; overflow:hidden;">
+    <div class="par-grid">
+      {% for i in "1234" %}
+      <div class="par-col">
+        <div class="skel-bar" style="width:60%; height:11px; margin-bottom:10px;"></div>
+        <div class="skel-bar" style="width:80%; height:22px;"></div>
+      </div>
+      {% endfor %}
     </div>
-
-    <div class="par-col">
-      <div class="par-label">PAR 1 à 120 j</div>
-      <div class="par-amount" data-fmt="{{ encours_par.par1 }}">—</div>
-      <span class="par-pct orange" data-pct="{{ encours_par.par1_pct|stringformat:'.10f' }}">—</span>
-    </div>
-
-    <div class="par-col">
-      <div class="par-label">PAR 30 à 120 j</div>
-      <div class="par-amount" data-fmt="{{ encours_par.par30 }}">—</div>
-      <span class="par-pct orange" data-pct="{{ encours_par.par30_pct|stringformat:'.10f' }}">—</span>
-    </div>
-
-    <div class="par-col">
-      <div class="par-label">PAR > 60 j</div>
-      <div class="par-amount" data-fmt="{{ encours_par.par60 }}">—</div>
-      <span class="par-pct red" data-pct="{{ encours_par.par60_pct|stringformat:'.10f' }}">—</span>
-    </div>
-
   </div>
 </div>
-{% endif %}
 
-<!-- ── KPI Cards ──────────────────────────────────────────────── -->
+<!-- ── Bilan PAMF ↔ SOLIDIS (chargement différé) ─────────────── -->
+<div id="bilan-slot" hx-get="{% url 'dash_bilan' %}" hx-trigger="load" hx-swap="outerHTML">
+  <div class="card" style="margin-bottom:24px; padding:0; overflow:hidden;">
+    <div class="bilan-grid">
+      {% for i in "123" %}
+      <div class="bilan-col">
+        <div class="skel-bar" style="width:60%; height:11px; margin-bottom:10px;"></div>
+        <div class="skel-bar" style="width:70%; height:24px;"></div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<!-- ── KPI Cards (chargement différé, en parallèle) ──────────── -->
 <div class="db-grid">
 
-  <!-- Appels de garantie -->
-  <div class="card kpi-card">
-    <div class="kpi-top">
-      <div>
-        <div class="kpi-module">Appels de garantie</div>
-        <div class="kpi-count">{{ g_count }}</div>
-        <div class="kpi-count-label">process au total</div>
-      </div>
-      <a href="{% url 'garantie:dashboard' %}" class="btn btn-sm btn-outline">Voir tout →</a>
+  <div id="appels-kpi-slot" hx-get="{% url 'dash_appels' %}" hx-trigger="load" hx-swap="outerHTML">
+    <div class="card kpi-card">
+      <div class="skel-bar" style="width:50%; height:11px; margin-bottom:10px;"></div>
+      <div class="skel-bar" style="width:30%; height:34px;"></div>
     </div>
-    <hr class="kpi-sep">
-    <div class="kpi-metric">
-      <div class="kpi-metric-label">Montant total appelé</div>
-      <div class="kpi-metric-value green" data-fmt="{{ g_montant }}">—</div>
-    </div>
-    {% if g_statuts %}
-    <div class="kpi-statuts">
-      {% for statut, count in g_statuts.items %}
-      <span class="badge badge-{{ statut }}">{{ count }}</span>
-      {% endfor %}
-    </div>
-    {% endif %}
   </div>
 
-  <!-- Commissions -->
-  <div class="card kpi-card">
-    <div class="kpi-top">
-      <div>
-        <div class="kpi-module">Commissions</div>
-        <div class="kpi-count">{{ c_count }}</div>
-        <div class="kpi-count-label">process au total</div>
-      </div>
-      <a href="{% url 'commission:dashboard' %}" class="btn btn-sm btn-outline">Voir tout →</a>
+  <div id="commissions-kpi-slot" hx-get="{% url 'dash_commissions' %}" hx-trigger="load" hx-swap="outerHTML">
+    <div class="card kpi-card">
+      <div class="skel-bar" style="width:50%; height:11px; margin-bottom:10px;"></div>
+      <div class="skel-bar" style="width:30%; height:34px;"></div>
     </div>
-    <hr class="kpi-sep">
-    <div class="kpi-row">
-      <div class="kpi-metric">
-        <div class="kpi-metric-label">Commission 1</div>
-        <div class="kpi-metric-value" data-fmt="{{ c_com1 }}">—</div>
-      </div>
-      <div class="kpi-metric">
-        <div class="kpi-metric-label">Commission 2</div>
-        <div class="kpi-metric-value" data-fmt="{{ c_com2 }}">—</div>
-      </div>
-    </div>
-    <div class="kpi-metric" style="margin-top:12px;">
-      <div class="kpi-metric-label">Total</div>
-      <div class="kpi-metric-value green" data-fmt="{{ c_total }}">—</div>
-    </div>
-    {% if c_statuts %}
-    <div class="kpi-statuts">
-      {% for statut, count in c_statuts.items %}
-      <span class="badge badge-{{ statut }}">{{ count }}</span>
-      {% endfor %}
-    </div>
-    {% endif %}
   </div>
 
-  <!-- Recouvrements -->
-  <div class="card kpi-card">
-    <div class="kpi-top">
-      <div>
-        <div class="kpi-module">Recouvrements</div>
-        <div class="kpi-count">{{ r_count }}</div>
-        <div class="kpi-count-label">process au total</div>
-      </div>
-      <a href="{% url 'recouvrement:dashboard' %}" class="btn btn-sm btn-outline">Voir tout →</a>
+  <div id="recouvrements-kpi-slot" hx-get="{% url 'dash_recouvrements' %}" hx-trigger="load" hx-swap="outerHTML">
+    <div class="card kpi-card">
+      <div class="skel-bar" style="width:50%; height:11px; margin-bottom:10px;"></div>
+      <div class="skel-bar" style="width:30%; height:34px;"></div>
     </div>
-    <hr class="kpi-sep">
-    <div class="kpi-metric">
-      <div class="kpi-metric-label">Total remboursé</div>
-      <div class="kpi-metric-value orange" data-fmt="{{ r_remb }}">—</div>
-    </div>
-    <div class="kpi-metric" style="margin-top:12px;">
-      <div class="kpi-metric-label">Part SOLIDIS (50 %)</div>
-      <div class="kpi-metric-value blue" data-fmt="{{ r_rec }}">—</div>
-    </div>
-    {% if r_statuts %}
-    <div class="kpi-statuts">
-      {% for statut, count in r_statuts.items %}
-      <span class="badge badge-{{ statut }}">{{ count }}</span>
-      {% endfor %}
-    </div>
-    {% endif %}
   </div>
 
 </div>
 
-<!-- ── Activité récente ───────────────────────────────────────── -->
+<!-- ── Activité récente (remplie via swap hors-bande par les requêtes ci-dessus) ── -->
 <div class="db-grid">
-
-  <!-- Derniers appels -->
-  <div class="card" style="margin-bottom:0;">
-    <div class="recent-title">
-      Derniers appels de garantie
-      <a href="{% url 'garantie:dashboard' %}">Tout voir →</a>
-    </div>
-    {% if g_recent %}
-    <table class="mini-table">
-      <thead>
-        <tr>
-          <th>Période</th>
-          <th style="text-align:right;">Situations</th>
-          <th style="text-align:right;">Montant</th>
-          <th>Statut</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for p in g_recent %}
-        <tr>
-          <td><a href="{% url 'garantie:detail' p.pk %}">{{ p.date_from|date:"d/m/y" }} → {{ p.date_to|date:"d/m/y" }}</a></td>
-          <td style="text-align:right;">{{ p.nb_sit }}</td>
-          <td style="text-align:right; font-weight:600;" data-fmt="{{ p.montant }}">—</td>
-          <td><span class="badge badge-{{ p.statut }}" style="font-size:10px;">{{ p.get_statut_display }}</span></td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-    {% else %}
-    <div class="empty-state">Aucun appel lancé.</div>
-    {% endif %}
+  <div id="appels-recent-slot" class="card">
+    <div class="skel-bar" style="width:100%; height:80px;"></div>
   </div>
-
-  <!-- Dernières commissions -->
-  <div class="card" style="margin-bottom:0;">
-    <div class="recent-title">
-      Dernières commissions
-      <a href="{% url 'commission:dashboard' %}">Tout voir →</a>
-    </div>
-    {% if c_recent %}
-    <table class="mini-table">
-      <thead>
-        <tr>
-          <th>Période</th>
-          <th style="text-align:right;">Lignes</th>
-          <th style="text-align:right;">Total</th>
-          <th>Statut</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for p in c_recent %}
-        <tr>
-          <td><a href="{% url 'commission:detail' p.pk %}">{{ p.date_from|date:"d/m/y" }} → {{ p.date_to|date:"d/m/y" }}</a></td>
-          <td style="text-align:right;">{{ p.nb_det }}</td>
-          <td style="text-align:right; font-weight:600;" data-fmt="{{ p.total }}">—</td>
-          <td><span class="badge badge-{{ p.statut }}" style="font-size:10px;">{{ p.get_statut_display }}</span></td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-    {% else %}
-    <div class="empty-state">Aucune commission lancée.</div>
-    {% endif %}
+  <div id="commissions-recent-slot" class="card">
+    <div class="skel-bar" style="width:100%; height:80px;"></div>
   </div>
-
-  <!-- Derniers recouvrements -->
-  <div class="card" style="margin-bottom:0;">
-    <div class="recent-title">
-      Derniers recouvrements
-      <a href="{% url 'recouvrement:dashboard' %}">Tout voir →</a>
-    </div>
-    {% if r_recent %}
-    <table class="mini-table">
-      <thead>
-        <tr>
-          <th>Période</th>
-          <th style="text-align:right;">Prêts</th>
-          <th style="text-align:right;">Part SOLIDIS</th>
-          <th>Statut</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for p in r_recent %}
-        <tr>
-          <td><a href="{% url 'recouvrement:detail' p.pk %}">{{ p.date_from|date:"d/m/y" }} → {{ p.date_to|date:"d/m/y" }}</a></td>
-          <td style="text-align:right;">{{ p.nb_trx }}</td>
-          <td style="text-align:right; font-weight:600;" data-fmt="{{ p.total_rec }}">—</td>
-          <td><span class="badge badge-{{ p.statut }}" style="font-size:10px;">{{ p.get_statut_display }}</span></td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-    {% else %}
-    <div class="empty-state">Aucun recouvrement lancé.</div>
-    {% endif %}
+  <div id="recouvrements-recent-slot" class="card">
+    <div class="skel-bar" style="width:100%; height:80px;"></div>
   </div>
-
 </div>
 
-<!-- ── Sorties en portefeuille ──────────────────────────────── -->
-<div class="card" style="margin-bottom:0;">
-  <div class="recent-title">
-    Sorties en portefeuille (Encours = 0)
-    <a href="{% url 'sortie:dashboard' %}">Tout voir →</a>
+<!-- ── Sorties en portefeuille (chargement différé) ──────────── -->
+<div id="sorties-slot" hx-get="{% url 'dash_sorties' %}" hx-trigger="load" hx-swap="outerHTML">
+  <div class="card" style="margin-bottom:0;">
+    <div class="skel-bar" style="width:100%; height:100px;"></div>
   </div>
-  <div class="kpi-row" style="margin-bottom:16px;">
-    <div class="kpi-metric">
-      <div class="kpi-metric-label">Mois avec sorties</div>
-      <div class="kpi-metric-value">{{ s_count }}</div>
-    </div>
-    <div class="kpi-metric">
-      <div class="kpi-metric-label">Montant total sorti</div>
-      <div class="kpi-metric-value" style="color:#c5221f;" data-fmt="{{ s_montant }}">—</div>
-    </div>
-  </div>
-  {% if s_recent %}
-  <table class="mini-table">
-    <thead>
-      <tr>
-        <th>Mois</th>
-        <th style="text-align:right;">Nb prêts</th>
-        <th style="text-align:right;">Montant sorti</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for r in s_recent %}
-      <tr>
-        <td><a href="{% url 'sortie:dashboard' %}">{{ r.monthdate }}</a></td>
-        <td style="text-align:right;">{{ r.nb_prets }}</td>
-        <td style="text-align:right; font-weight:600;" data-fmt="{{ r.montant_sortie }}">—</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  {% else %}
-  <div class="empty-state">Aucune sortie en portefeuille.</div>
-  {% endif %}
 </div>
 
-<script>
-(function () {
-  var fmt    = new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  var fmtPct = new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
-  document.querySelectorAll('[data-fmt]').forEach(function (el) {
-    var v = parseFloat(el.dataset.fmt);
-    if (!isNaN(v)) el.textContent = fmt.format(v);
-  });
-
-  document.querySelectorAll('[data-pct]').forEach(function (el) {
-    var v = parseFloat(el.dataset.pct);
-    if (!isNaN(v)) el.textContent = fmtPct.format(v * 100) + ' %';
-  });
-})();
-</script>
 {% endblock %}

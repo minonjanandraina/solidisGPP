@@ -1,14 +1,9 @@
-import platform
-
-import pandas as pd
-import pyodbc
+from django.db import connection
 
 
-def _get_conx():
-    driver = "ODBC Driver 17 for SQL Server" if platform.system() == "Linux" else "SQL Server"
-    return pyodbc.connect(
-        f"DRIVER={{{driver}}};SERVER=172.20.24.37;DATABASE=solidis;UID=Minonja;PWD=Minonja"
-    )
+def _dictfetchall(cursor):
+    columns = [col[0] for col in cursor.description]
+    return [dict(zip(columns, row)) for row in cursor.fetchall()]
 
 
 def get_sorties_summary() -> list:
@@ -22,10 +17,11 @@ def get_sorties_summary() -> list:
     JOIN cbs.dbo.loLoan l ON l.loLoanID = r.loLoanID
     WHERE r.Encours = 0
     GROUP BY CONCAT(YEAR([reportDate]), '-', RIGHT(CONCAT('000', MONTH([reportDate])), 2))
-    ORDER BY CONCAT(YEAR([reportDate]), '-', RIGHT(CONCAT('000', MONTH([reportDate])), 2)) desc 
+    ORDER BY CONCAT(YEAR([reportDate]), '-', RIGHT(CONCAT('000', MONTH([reportDate])), 2)) desc
     """
-    df = pd.read_sql(sql, _get_conx())
-    return df.to_dict('records') if not df.empty else []
+    with connection.cursor() as cursor:
+        cursor.execute(sql)
+        return _dictfetchall(cursor)
 
 
 def get_sorties_detail(monthdate: str) -> list:
@@ -41,8 +37,9 @@ def get_sorties_detail(monthdate: str) -> list:
     FROM [solidis].[dbo].[Solidis_loan_update_monthly_reports] r
     JOIN cbs.dbo.loLoan l ON l.loLoanID = r.loLoanID
     WHERE r.Encours = 0
-      AND CONCAT(YEAR([reportDate]), '-', RIGHT(CONCAT('000', MONTH([reportDate])), 2)) = '{monthdate}'
+      AND CONCAT(YEAR([reportDate]), '-', RIGHT(CONCAT('000', MONTH([reportDate])), 2)) = %s
     ORDER BY r.reportDate, l.AgreementDate desc
-    """.format(monthdate=monthdate.replace("'", ""))
-    df = pd.read_sql(sql, _get_conx())
-    return df.to_dict('records') if not df.empty else []
+    """
+    with connection.cursor() as cursor:
+        cursor.execute(sql, [monthdate])
+        return _dictfetchall(cursor)

@@ -1,0 +1,53 @@
+<div class="card kpi-card">
+  <div class="kpi-top">
+    <div>
+      <div class="kpi-module">Appels de garantie</div>
+      <div class="kpi-count">{{ g_count }}</div>
+      <div class="kpi-count-label">process au total</div>
+    </div>
+    <a href="{% url 'garantie:dashboard' %}" class="btn btn-sm btn-outline">Voir tout →</a>
+  </div>
+  <hr class="kpi-sep">
+  <div class="kpi-metric">
+    <div class="kpi-metric-label">Montant total appelé</div>
+    <div class="kpi-metric-value green">{{ g_montant_fmt }}</div>
+  </div>
+  {% if g_statuts %}
+  <div class="kpi-statuts">
+    {% for statut, count in g_statuts.items %}
+    <span class="badge badge-{{ statut }}">{{ count }}</span>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+
+<div id="appels-recent-slot" class="card" hx-swap-oob="true">
+  <div class="recent-title">
+    Derniers appels de garantie
+    <a href="{% url 'garantie:dashboard' %}">Tout voir →</a>
+  </div>
+  {% if g_recent %}
+  <table class="mini-table">
+    <thead>
+      <tr>
+        <th>Période</th>
+        <th style="text-align:right;">Situations</th>
+        <th style="text-align:right;">Montant</th>
+        <th>Statut</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in g_recent %}
+      <tr>
+        <td><a href="{% url 'garantie:detail' p.pk %}">{{ p.date_from|date:"d/m/y" }} → {{ p.date_to|date:"d/m/y" }}</a></td>
+        <td style="text-align:right;">{{ p.nb_sit }}</td>
+        <td style="text-align:right; font-weight:600;">{{ p.montant_fmt }}</td>
+        <td><span class="badge badge-{{ p.statut }}" style="font-size:10px;">{{ p.get_statut_display }}</span></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="empty-state">Aucun appel lancé.</div>
+  {% endif %}
+</div>

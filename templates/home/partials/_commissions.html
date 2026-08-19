@@ -1,0 +1,63 @@
+<div class="card kpi-card">
+  <div class="kpi-top">
+    <div>
+      <div class="kpi-module">Commissions</div>
+      <div class="kpi-count">{{ c_count }}</div>
+      <div class="kpi-count-label">process au total</div>
+    </div>
+    <a href="{% url 'commission:dashboard' %}" class="btn btn-sm btn-outline">Voir tout →</a>
+  </div>
+  <hr class="kpi-sep">
+  <div class="kpi-row">
+    <div class="kpi-metric">
+      <div class="kpi-metric-label">Commission 1</div>
+      <div class="kpi-metric-value">{{ c_com1_fmt }}</div>
+    </div>
+    <div class="kpi-metric">
+      <div class="kpi-metric-label">Commission 2</div>
+      <div class="kpi-metric-value">{{ c_com2_fmt }}</div>
+    </div>
+  </div>
+  <div class="kpi-metric" style="margin-top:12px;">
+    <div class="kpi-metric-label">Total</div>
+    <div class="kpi-metric-value green">{{ c_total_fmt }}</div>
+  </div>
+  {% if c_statuts %}
+  <div class="kpi-statuts">
+    {% for statut, count in c_statuts.items %}
+    <span class="badge badge-{{ statut }}">{{ count }}</span>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+
+<div id="commissions-recent-slot" class="card" hx-swap-oob="true">
+  <div class="recent-title">
+    Dernières commissions
+    <a href="{% url 'commission:dashboard' %}">Tout voir →</a>
+  </div>
+  {% if c_recent %}
+  <table class="mini-table">
+    <thead>
+      <tr>
+        <th>Période</th>
+        <th style="text-align:right;">Lignes</th>
+        <th style="text-align:right;">Total</th>
+        <th>Statut</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in c_recent %}
+      <tr>
+        <td><a href="{% url 'commission:detail' p.pk %}">{{ p.date_from|date:"d/m/y" }} → {{ p.date_to|date:"d/m/y" }}</a></td>
+        <td style="text-align:right;">{{ p.nb_det }}</td>
+        <td style="text-align:right; font-weight:600;">{{ p.total_fmt }}</td>
+        <td><span class="badge badge-{{ p.statut }}" style="font-size:10px;">{{ p.get_statut_display }}</span></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="empty-state">Aucune commission lancée.</div>
+  {% endif %}
+</div>

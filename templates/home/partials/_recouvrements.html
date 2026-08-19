@@ -1,0 +1,57 @@
+<div class="card kpi-card">
+  <div class="kpi-top">
+    <div>
+      <div class="kpi-module">Recouvrements</div>
+      <div class="kpi-count">{{ r_count }}</div>
+      <div class="kpi-count-label">process au total</div>
+    </div>
+    <a href="{% url 'recouvrement:dashboard' %}" class="btn btn-sm btn-outline">Voir tout →</a>
+  </div>
+  <hr class="kpi-sep">
+  <div class="kpi-metric">
+    <div class="kpi-metric-label">Total remboursé</div>
+    <div class="kpi-metric-value orange">{{ r_remb_fmt }}</div>
+  </div>
+  <div class="kpi-metric" style="margin-top:12px;">
+    <div class="kpi-metric-label">Part SOLIDIS (50 %)</div>
+    <div class="kpi-metric-value blue">{{ r_rec_fmt }}</div>
+  </div>
+  {% if r_statuts %}
+  <div class="kpi-statuts">
+    {% for statut, count in r_statuts.items %}
+    <span class="badge badge-{{ statut }}">{{ count }}</span>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+
+<div id="recouvrements-recent-slot" class="card" hx-swap-oob="true">
+  <div class="recent-title">
+    Derniers recouvrements
+    <a href="{% url 'recouvrement:dashboard' %}">Tout voir →</a>
+  </div>
+  {% if r_recent %}
+  <table class="mini-table">
+    <thead>
+      <tr>
+        <th>Période</th>
+        <th style="text-align:right;">Prêts</th>
+        <th style="text-align:right;">Part SOLIDIS</th>
+        <th>Statut</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in r_recent %}
+      <tr>
+        <td><a href="{% url 'recouvrement:detail' p.pk %}">{{ p.date_from|date:"d/m/y" }} → {{ p.date_to|date:"d/m/y" }}</a></td>
+        <td style="text-align:right;">{{ p.nb_trx }}</td>
+        <td style="text-align:right; font-weight:600;">{{ p.total_rec_fmt }}</td>
+        <td><span class="badge badge-{{ p.statut }}" style="font-size:10px;">{{ p.get_statut_display }}</span></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="empty-state">Aucun recouvrement lancé.</div>
+  {% endif %}
+</div>

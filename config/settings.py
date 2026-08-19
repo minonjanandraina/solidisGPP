@@ -45,6 +45,12 @@ import platform as _platform
 _driver = "ODBC Driver 17 for SQL Server" if _platform.system() == "Linux" else "ODBC Driver 13 for SQL Server"
 
 
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+    }
+}
+
 DATABASES = {
     "default": {
         "ENGINE": "mssql",

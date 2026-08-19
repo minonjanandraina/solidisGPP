@@ -2,10 +2,26 @@ from django.db import connection
 from django.db.models import Count, DecimalField, Sum
 from django.db.models.functions import Coalesce
 from django.shortcuts import render
+from django.views.decorators.cache import cache_page
+from django.views.decorators.http import require_GET
 
 from commission.models import CommissionDetail, CommissionProcess
 from garantie.models import ProcesseAppelDeGarantie
 from recouvrement.models import RecouvrementProcess
+
+PARTIAL_CACHE_SECONDS = 60 * 15
+
+
+def _fmt_amount(value):
+    if value is None:
+        return "—"
+    return f"{value:,.2f}".replace(",", " ").replace(".", ",")
+
+
+def _fmt_pct(value):
+    if value is None:
+        return "—"
+    return f"{float(value) * 100:.2f}".replace(".", ",") + " %"
 
 
 def _get_encours_par():
@@ -37,18 +53,36 @@ def _get_encours_par():
             return None
         keys = ['report_date', 'encours_total', 'encours_sain',
                 'par1', 'par30', 'par60', 'par1_pct', 'par30_pct', 'par60_pct']
-        print(dict(zip(keys, row)))
-        return dict(zip(keys, row))
+        data = dict(zip(keys, row))
+        for k in ('encours_total', 'par1', 'par30', 'par60'):
+            data[f'{k}_fmt'] = _fmt_amount(data[k])
+        for k in ('par1_pct', 'par30_pct', 'par60_pct'):
+            data[f'{k}_fmt'] = _fmt_pct(data[k])
+        return data
     except Exception:
         return None
 
 
 def home_dashboard(request):
-    # ── Encours & PAR (dernière date disponible) ───────────────────
-    encours_par = _get_encours_par()
+    """Coquille de la page : ne fait aucune requête lourde.
+    Chaque section se charge ensuite de façon indépendante via HTMX."""
+    return render(request, 'home/dashboard.html')
 
-    # ── Appels de garantie ─────────────────────────────────────────
-    g_recent = ProcesseAppelDeGarantie.objects.annotate(
+
+@require_GET
+@cache_page(PARTIAL_CACHE_SECONDS)
+def dash_encours_par(request):
+    return render(request, 'home/partials/_encours_par.html', {
+        'encours_par': _get_encours_par(),
+    })
+
+
+@require_GET
+@cache_page(PARTIAL_CACHE_SECONDS)
+def dash_appels(request):
+    g_qs = ProcesseAppelDeGarantie.objects.exclude(statut=ProcesseAppelDeGarantie.Statut.REJETE)
+
+    g_recent = g_qs.annotate(
         nb_sit=Count('situations', distinct=True),
         montant=Coalesce(
             Sum('situations__montant_appel_garanti'), 0,
@@ -56,8 +90,8 @@ def home_dashboard(request):
         ),
     ).order_by('-date_from')[:5]
 
-    g_agg = ProcesseAppelDeGarantie.objects.aggregate(
-        count=Count('id'),
+    g_agg = g_qs.aggregate(
+        count=Count('id', distinct=True),
         montant_total=Coalesce(
             Sum('situations__montant_appel_garanti'), 0,
             output_field=DecimalField(max_digits=18, decimal_places=2),
@@ -65,11 +99,25 @@ def home_dashboard(request):
     )
     g_statuts = {
         s['statut']: s['n']
-        for s in ProcesseAppelDeGarantie.objects.values('statut').annotate(n=Count('id'))
+        for s in g_qs.values('statut').annotate(n=Count('id'))
     }
+    for p in g_recent:
+        p.montant_fmt = _fmt_amount(p.montant)
 
-    # ── Commissions ────────────────────────────────────────────────
-    c_recent = CommissionProcess.objects.annotate(
+    return render(request, 'home/partials/_appels.html', {
+        'g_count':       g_agg['count'],
+        'g_montant_fmt': _fmt_amount(g_agg['montant_total']),
+        'g_statuts':     g_statuts,
+        'g_recent':      g_recent,
+    })
+
+
+@require_GET
+@cache_page(PARTIAL_CACHE_SECONDS)
+def dash_commissions(request):
+    c_qs = CommissionProcess.objects.exclude(statut=CommissionProcess.Statut.REJETE)
+
+    c_recent = c_qs.annotate(
         nb_det=Count('details', distinct=True),
         total=Coalesce(
             Sum('details__commission'), 0,
@@ -77,8 +125,8 @@ def home_dashboard(request):
         ),
     ).order_by('-date_from')[:5]
 
-    c_agg = CommissionProcess.objects.aggregate(
-        count=Count('id'),
+    c_agg = c_qs.aggregate(
+        count=Count('id', distinct=True),
         total=Coalesce(
             Sum('details__commission'), 0,
             output_field=DecimalField(max_digits=18, decimal_places=2),
@@ -86,21 +134,41 @@ def home_dashboard(request):
     )
     c_com1 = CommissionDetail.objects.filter(
         commission_type__startswith='Commission 1',
+    ).exclude(
+        process__statut=CommissionProcess.Statut.REJETE,
     ).aggregate(
         t=Coalesce(Sum('commission'), 0, output_field=DecimalField(max_digits=18, decimal_places=2))
     )['t']
     c_com2 = CommissionDetail.objects.filter(
         commission_type__startswith='Commission 2',
+    ).exclude(
+        process__statut=CommissionProcess.Statut.REJETE,
     ).aggregate(
         t=Coalesce(Sum('commission'), 0, output_field=DecimalField(max_digits=18, decimal_places=2))
     )['t']
     c_statuts = {
         s['statut']: s['n']
-        for s in CommissionProcess.objects.values('statut').annotate(n=Count('id'))
+        for s in c_qs.values('statut').annotate(n=Count('id'))
     }
+    for p in c_recent:
+        p.total_fmt = _fmt_amount(p.total)
 
-    # ── Recouvrements ──────────────────────────────────────────────
-    r_recent = RecouvrementProcess.objects.annotate(
+    return render(request, 'home/partials/_commissions.html', {
+        'c_count':       c_agg['count'],
+        'c_total_fmt':   _fmt_amount(c_agg['total']),
+        'c_com1_fmt':    _fmt_amount(c_com1),
+        'c_com2_fmt':    _fmt_amount(c_com2),
+        'c_statuts':     c_statuts,
+        'c_recent':      c_recent,
+    })
+
+
+@require_GET
+@cache_page(PARTIAL_CACHE_SECONDS)
+def dash_recouvrements(request):
+    r_qs = RecouvrementProcess.objects.exclude(statut=RecouvrementProcess.Statut.REJETE)
+
+    r_recent = r_qs.annotate(
         nb_trx=Count('transactions', distinct=True),
         total_rec=Coalesce(
             Sum('transactions__recouvrement_a_reverser'), 0,
@@ -108,8 +176,8 @@ def home_dashboard(request):
         ),
     ).order_by('-date_from')[:5]
 
-    r_agg = RecouvrementProcess.objects.aggregate(
-        count=Count('id'),
+    r_agg = r_qs.aggregate(
+        count=Count('id', distinct=True),
         total_remb=Coalesce(
             Sum('transactions__total_remboursement_principale'), 0,
             output_field=DecimalField(max_digits=18, decimal_places=2),
@@ -121,10 +189,23 @@ def home_dashboard(request):
     )
     r_statuts = {
         s['statut']: s['n']
-        for s in RecouvrementProcess.objects.values('statut').annotate(n=Count('id'))
+        for s in r_qs.values('statut').annotate(n=Count('id'))
     }
+    for p in r_recent:
+        p.total_rec_fmt = _fmt_amount(p.total_rec)
 
-    # ── Sorties en portefeuille ───────────────────────────────────
+    return render(request, 'home/partials/_recouvrements.html', {
+        'r_count':     r_agg['count'],
+        'r_remb_fmt':  _fmt_amount(r_agg['total_remb']),
+        'r_rec_fmt':   _fmt_amount(r_agg['total_rec']),
+        'r_statuts':   r_statuts,
+        'r_recent':    r_recent,
+    })
+
+
+@require_GET
+@cache_page(PARTIAL_CACHE_SECONDS)
+def dash_sorties(request):
     try:
         from sortie.services import get_sorties_summary
         _s_data   = get_sorties_summary()
@@ -136,28 +217,46 @@ def home_dashboard(request):
         s_montant = 0.0
         s_recent  = []
 
-    return render(request, 'home/dashboard.html', {
-        'encours_par': encours_par,
+    for r in s_recent:
+        r['montant_sortie_fmt'] = _fmt_amount(r.get('montant_sortie'))
 
-        'g_count':   g_agg['count'],
-        'g_montant': g_agg['montant_total'],
-        'g_statuts': g_statuts,
-        'g_recent':  g_recent,
+    return render(request, 'home/partials/_sorties.html', {
+        's_count':       s_count,
+        's_montant_fmt': _fmt_amount(s_montant),
+        's_recent':      s_recent,
+    })
 
-        'c_count':   c_agg['count'],
-        'c_total':   c_agg['total'],
-        'c_com1':    c_com1,
-        'c_com2':    c_com2,
-        'c_statuts': c_statuts,
-        'c_recent':  c_recent,
 
-        'r_count':   r_agg['count'],
-        'r_remb':    r_agg['total_remb'],
-        'r_rec':     r_agg['total_rec'],
-        'r_statuts': r_statuts,
-        'r_recent':  r_recent,
+@require_GET
+@cache_page(PARTIAL_CACHE_SECONDS)
+def dash_bilan(request):
+    # Flux entrants pour PAMF : appel de garantie (SOLIDIS paie PAMF = Encours * 0.5)
+    # Flux sortants pour PAMF : commissions (1.5% Encours) + part SOLIDIS sur recouvrement (50%)
+    pamf_recu = ProcesseAppelDeGarantie.objects.exclude(
+        statut=ProcesseAppelDeGarantie.Statut.REJETE,
+    ).aggregate(
+        t=Coalesce(Sum('situations__montant_appel_garanti'), 0,
+                   output_field=DecimalField(max_digits=18, decimal_places=2))
+    )['t']
+    c_total = CommissionProcess.objects.exclude(
+        statut=CommissionProcess.Statut.REJETE,
+    ).aggregate(
+        t=Coalesce(Sum('details__commission'), 0,
+                   output_field=DecimalField(max_digits=18, decimal_places=2))
+    )['t']
+    r_total_rec = RecouvrementProcess.objects.exclude(
+        statut=RecouvrementProcess.Statut.REJETE,
+    ).aggregate(
+        t=Coalesce(Sum('transactions__recouvrement_a_reverser'), 0,
+                   output_field=DecimalField(max_digits=18, decimal_places=2))
+    )['t']
 
-        's_count':   s_count,
-        's_montant': s_montant,
-        's_recent':  s_recent,
+    pamf_paye  = c_total + r_total_rec
+    pamf_solde = pamf_recu - pamf_paye
+
+    return render(request, 'home/partials/_bilan.html', {
+        'pamf_recu_fmt':  _fmt_amount(pamf_recu),
+        'pamf_paye_fmt':  _fmt_amount(pamf_paye),
+        'pamf_solde_fmt': _fmt_amount(pamf_solde),
+        'pamf_solde':     pamf_solde,
     })
