@@ -1,3 +1,6 @@
+from collections import defaultdict
+from decimal import Decimal
+
 from django.db import connection
 from django.db.models import Count, DecimalField, Sum
 from django.db.models.functions import Coalesce
@@ -10,6 +13,9 @@ from garantie.models import ProcesseAppelDeGarantie
 from recouvrement.models import RecouvrementProcess
 
 PARTIAL_CACHE_SECONDS = 60 * 15
+
+_MOIS_FR = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin',
+            'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.']
 
 
 def _fmt_amount(value):
@@ -61,6 +67,58 @@ def _get_encours_par():
         return data
     except Exception:
         return None
+
+
+def _month_label(d):
+    return f"{_MOIS_FR[d.month - 1]} {d.year}"
+
+
+def _get_solde_evolution():
+    """Solde net PAMF (reçu - payé) regroupé par mois (date_from des process)."""
+    recu_par_mois = defaultdict(Decimal)
+    paye_par_mois = defaultdict(Decimal)
+
+    g_rows = ProcesseAppelDeGarantie.objects.exclude(
+        statut=ProcesseAppelDeGarantie.Statut.REJETE,
+    ).annotate(
+        montant=Coalesce(Sum('situations__montant_appel_garanti'), 0,
+                          output_field=DecimalField(max_digits=18, decimal_places=2)),
+    ).values('date_from', 'montant')
+    for row in g_rows:
+        recu_par_mois[row['date_from'].replace(day=1)] += row['montant']
+
+    c_rows = CommissionProcess.objects.exclude(
+        statut=CommissionProcess.Statut.REJETE,
+    ).annotate(
+        total=Coalesce(Sum('details__commission'), 0,
+                        output_field=DecimalField(max_digits=18, decimal_places=2)),
+    ).values('date_from', 'total')
+    for row in c_rows:
+        paye_par_mois[row['date_from'].replace(day=1)] += row['total']
+
+    r_rows = RecouvrementProcess.objects.exclude(
+        statut=RecouvrementProcess.Statut.REJETE,
+    ).annotate(
+        total_rec=Coalesce(Sum('transactions__recouvrement_a_reverser'), 0,
+                            output_field=DecimalField(max_digits=18, decimal_places=2)),
+    ).values('date_from', 'total_rec')
+    for row in r_rows:
+        paye_par_mois[row['date_from'].replace(day=1)] += row['total_rec']
+
+    mois = sorted(set(recu_par_mois) | set(paye_par_mois), reverse=True)
+    evolution = []
+    for m in mois:
+        recu  = recu_par_mois.get(m, Decimal('0'))
+        paye  = paye_par_mois.get(m, Decimal('0'))
+        solde = recu - paye
+        evolution.append({
+            'label':          _month_label(m),
+            'recu_fmt':       _fmt_amount(recu),
+            'paye_fmt':       _fmt_amount(paye),
+            'solde_fmt':      _fmt_amount(solde),
+            'solde_positive': solde >= 0,
+        })
+    return evolution
 
 
 def home_dashboard(request):
@@ -255,8 +313,9 @@ def dash_bilan(request):
     pamf_solde = pamf_recu - pamf_paye
 
     return render(request, 'home/partials/_bilan.html', {
-        'pamf_recu_fmt':  _fmt_amount(pamf_recu),
-        'pamf_paye_fmt':  _fmt_amount(pamf_paye),
-        'pamf_solde_fmt': _fmt_amount(pamf_solde),
-        'pamf_solde':     pamf_solde,
+        'pamf_recu_fmt':    _fmt_amount(pamf_recu),
+        'pamf_paye_fmt':    _fmt_amount(pamf_paye),
+        'pamf_solde_fmt':   _fmt_amount(pamf_solde),
+        'pamf_solde':       pamf_solde,
+        'solde_evolution':  _get_solde_evolution(),
     })
