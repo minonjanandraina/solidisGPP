@@ -19,7 +19,7 @@ def _get_last_allocation_id() -> int:
     return result['max_id'] or 0
 
 
-def _get_recouvrements(date_from: str, date_to: str, last_allocation_id: int) -> pd.DataFrame:
+def _get_recouvrements(date_from: str, date_to: str) -> pd.DataFrame:
     sql = """
     SELECT
         r.IDCREDIT,
@@ -37,19 +37,20 @@ def _get_recouvrements(date_from: str, date_to: str, last_allocation_id: int) ->
     LEFT JOIN CBS.dbo.loloanAllocation lA ON lA.loLoanCreditID = lc.loLoanCreditID
     LEFT JOIN CBS.dbo.loloanDebit lD    ON lD.loLoanDebitID    = lA.loLoanDebitID
     WHERE r.DaysInArrears = 61
-      AND r.reportDate BETWEEN '{dateFrom}' AND '{dateTo}'
+      
       AND lA.Date > r.reportDate
       AND lD.DebitType = 2
-      AND lA.loloanAllocationID > {lastId}
-      AND CAST(lA.[Date] AS date) <= '{dateTo}'
+	and la.Date BETWEEN '{dateFrom}' AND '{dateTo}'
     GROUP BY r.IDCREDIT, r.loLoanID, l.AgreementNumber, l.AgreementDate
     ORDER BY l.AgreementDate
-    """.format(dateFrom=date_from, dateTo=date_to, lastId=last_allocation_id)
+    
+    
+    """.format(dateFrom=date_from, dateTo=date_to)
     return pd.read_sql(sql, _get_conx())
 
 
 def lancer_recouvrement(date_from: str, date_to: str) -> RecouvrementProcess:
-    last_id = _get_last_allocation_id()
+    
 
     process = RecouvrementProcess.objects.create(
         date_from=date_from,
@@ -57,7 +58,7 @@ def lancer_recouvrement(date_from: str, date_to: str) -> RecouvrementProcess:
         statut=RecouvrementProcess.Statut.EN_COURS,
     )
 
-    df = _get_recouvrements(date_from, date_to, last_id)
+    df = _get_recouvrements(date_from, date_to)
     df = df.dropna(subset=["loLoanID"])
     if not df.empty:
         RecouvrementTransaction.objects.bulk_create([
