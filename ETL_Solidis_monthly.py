@@ -687,6 +687,72 @@ def main(date_from, date_to):
         "jours_f2_bloques": 0,
     }
 
+    # --- 1) Déclaration F2, calculée et ENREGISTRÉE AVANT l'EMG ---------------------------
+    # get_emg_monthly() ne retient que les prêts déjà présents dans Solidis_f2_declared_v2
+    # (EXISTS ...). Si l'EMG du jour était calculé avant l'insertion du F2 du jour même,
+    # les prêts entrés en portefeuille ce jour-là étaient absents de leur propre encours du
+    # jour (ex : F2 du 31/07 non repris dans l'EMG du 31/07). On déclare donc le F2 d'abord.
+    #
+    # Le gating (build_f2_daily_states) ne dépend que de l'encours de la veille déjà
+    # persisté (get_encours_reference), jamais de l'EMG du jour lui-même : df_emg n'y sert
+    # qu'à faire progresser l'hystérésis sur les jours SUIVANTS d'un même appel — inutilisé
+    # ici puisque main() est toujours appelé jour par jour (date_from == date_to).
+    daily_states, f2_bloque_fin = build_f2_daily_states(
+        date_from, date_to, pd.DataFrame(columns=["Encours", "reportDate"]), config
+    )
+    if f2_bloque_fin != config["f2_bloque"]:
+        update_f2_bloque(f2_bloque_fin)
+
+    jours_actifs = sum(1 for bloque in daily_states.values() if not bloque)
+    jours_bloques = len(daily_states) - jours_actifs
+    summary["f2_bloque"] = f2_bloque_fin
+    summary["jours_f2_actifs"] = jours_actifs
+    summary["jours_f2_bloques"] = jours_bloques
+
+    if jours_actifs == 0:
+        print(
+            f"⏸️ Déclaration F2 suspendue sur toute la période {date_from} → {date_to} "
+            f"(encours au-dessus du seuil de reprise chaque jour)."
+        )
+        f2_case = "f2_bloque"
+    else:
+        df_init_submition = get_init_submition(date_from, date_to)
+        df_init_submition_to_send = generate_initial(df_init_submition, date_to)
+        fn_f2 = generate_filename("PAMF_DIG F2 - monthly", date_to, "")
+
+        if len(df_init_submition_to_send) == 0:
+            print("⚠️ No eligible initial submissions to upload for the given date range.")
+            f2_case = "no_submissions"
+        else:
+            df_f2_actif, df_f2_exclu = filter_f2_by_daily_state(df_init_submition_to_send, daily_states)
+            summary["f2_lignes_exclues"] = int(len(df_f2_exclu))
+
+            if len(df_f2_actif) == 0:
+                print(
+                    f"⏸️ {len(df_f2_exclu)} entrée(s) F2 tombent un jour bloqué sur la période "
+                    f"{date_from} → {date_to} : aucune déclaration F2 ce run."
+                )
+                f2_case = "f2_bloque"
+            else:
+                # avant d'insérer, supprimer les F2 déjà déclarés sur la période pour éviter les doublons
+                existing_f2_deleted = delete_Solidis_f2_declared_v2(date_from, date_to)
+                if not existing_f2_deleted:
+                    print("❌ Skipping F2 upload to SQL due to delete failure")
+                    f2_case = "delete_failure"
+                else:
+                    df_f2_actif.to_excel(fn_f2, index=False, engine="openpyxl")
+                    save_f2_declared(df_f2_actif, date_to, engine)
+                    summary["f2_lignes"] = int(len(df_f2_actif))
+                    f2_case = "success"
+                    if jours_bloques:
+                        print(
+                            f"ℹ️ {jours_bloques} jour(s) bloqué(s) sur la période : "
+                            f"{len(df_f2_exclu)} entrée(s) F2 non déclarée(s) ce run."
+                        )
+
+    # --- 2) EMG : toujours calculé et envoyé, même si F2 est suspendu (comme avant) --------
+    # Calculé maintenant APRÈS la déclaration F2 ci-dessus, pour que les prêts tout juste
+    # insérés dans Solidis_f2_declared_v2 soient bien inclus dans l'encours du jour.
     df_emg = get_emg_monthly(date_to)
     df_emg = df_emg[
         ["IDCREDIT", "loLoanID", "CIN", "Encours", "DaysInArrears", "reportDate"]
@@ -709,7 +775,6 @@ def main(date_from, date_to):
         summary["case"] = "no_data"
         return summary
 
-    # EMG est toujours envoyé, même si F2 est suspendu
     df_emg.to_excel(fn_emg, index=False, engine="openpyxl")
     df_emg.to_sql(
         name="Solidis_loan_update_monthly_reports",
@@ -722,63 +787,7 @@ def main(date_from, date_to):
         df_emg.loc[df_emg["reportDate"] == df_emg["reportDate"].max(), "Encours"].sum()
     )
 
-    # --- Gating F2 jour par jour sur [date_from, date_to] (encours de j-1 vs plafond/seuil de reprise) ---
-    daily_states, f2_bloque_fin = build_f2_daily_states(date_from, date_to, df_emg, config)
-    if f2_bloque_fin != config["f2_bloque"]:
-        update_f2_bloque(f2_bloque_fin)
-
-    jours_actifs = sum(1 for bloque in daily_states.values() if not bloque)
-    jours_bloques = len(daily_states) - jours_actifs
-    summary["f2_bloque"] = f2_bloque_fin
-    summary["jours_f2_actifs"] = jours_actifs
-    summary["jours_f2_bloques"] = jours_bloques
-
-    if jours_actifs == 0:
-        print(
-            f"⏸️ Déclaration F2 suspendue sur toute la période {date_from} → {date_to} "
-            f"(encours au-dessus du seuil de reprise chaque jour)."
-        )
-        summary["case"] = "f2_bloque"
-        return summary
-
-    df_init_submition = get_init_submition(date_from, date_to)
-    df_init_submition_to_send = generate_initial(df_init_submition, date_to)
-    fn_f2 = generate_filename("PAMF_DIG F2 - monthly", date_to, "")
-
-    if len(df_init_submition_to_send) == 0:
-        print(
-            "⚠️ No eligible initial submissions to upload for the given date range."
-        )
-        summary["case"] = "no_submissions"
-        return summary
-
-    df_f2_actif, df_f2_exclu = filter_f2_by_daily_state(df_init_submition_to_send, daily_states)
-    summary["f2_lignes_exclues"] = int(len(df_f2_exclu))
-
-    if len(df_f2_actif) == 0:
-        print(
-            f"⏸️ {len(df_f2_exclu)} entrée(s) F2 tombent un jour bloqué sur la période "
-            f"{date_from} → {date_to} : aucune déclaration F2 ce run."
-        )
-        summary["case"] = "f2_bloque"
-        return summary
-
-    # avant d'insérer, supprimer les F2 déjà déclarés sur la période pour éviter les doublons en cas de re-run
-    existing_f2_deleted = delete_Solidis_f2_declared_v2(date_from, date_to)
-    if not existing_f2_deleted:
-        print("❌ Skipping F2 upload to SQL due to delete failure")
-        summary["case"] = "delete_failure"
-        return summary
-
-    df_f2_actif.to_excel(fn_f2, index=False, engine="openpyxl")
-    save_f2_declared(df_f2_actif, date_to, engine)
-    summary["f2_lignes"] = int(len(df_f2_actif))
-    summary["case"] = "success"
-    if jours_bloques:
-        print(
-            f"ℹ️ {jours_bloques} jour(s) bloqué(s) sur la période : "
-            f"{len(df_f2_exclu)} entrée(s) F2 non déclarée(s) ce run."
-        )
+    summary["case"] = f2_case
     return summary
 
 
