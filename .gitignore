@@ -14,3 +14,7 @@ dist/
 
 #ignore venv    
 venv/
+*.xsl
+*.xlsx
+*.txt
+*.sql
