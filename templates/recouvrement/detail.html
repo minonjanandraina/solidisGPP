@@ -65,6 +65,7 @@
       <col style="width:12%">
       <col style="width:15%">
       <col style="width:15%">
+      <col style="width:15%">
     </colgroup>
     <thead>
       <tr>
@@ -76,6 +77,7 @@
         <th>Encours appel</th>
         <th>Total remboursé</th>
         <th>Part SOLIDIS (50 %)</th>
+        <th>trx_id</th>
       </tr>
     </thead>
     <tbody>
@@ -95,6 +97,7 @@
             data-total-remb="{{ t.total_remboursement_principale|default:0|stringformat:'.2f' }}">{{ t.total_remboursement_principale|floatformat:2 }}</td>
         <td style="text-align:right; font-weight:700; color:#1a73e8;"
             data-recouvrement="{{ t.recouvrement_a_reverser|default:0|stringformat:'.2f' }}">{{ t.recouvrement_a_reverser|floatformat:2 }}</td>
+        <td style="text-align:right; font-size:11px; color:#5f6368;">{{ t.last_allocation_id|default:"—" }}</td>
       </tr>
       {% endfor %}
     </tbody>

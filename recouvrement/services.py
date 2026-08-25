@@ -26,11 +26,11 @@ def _get_recouvrements(date_from: str, date_to: str) -> pd.DataFrame:
         r.loLoanID,
         l.AgreementNumber               AS agreement_number,
         l.AgreementDate                 AS agreement_date,
-        MAX(l.LoanAmountCurrent)        AS loan_amount,
-        MAX(r.Encours)                  AS encours_au_moment_appel,
-        SUM(CASE WHEN lD.DebitType = 2 THEN lA.AmountCRY ELSE 0 END)     AS total_remboursement_principale,
-        SUM(CASE WHEN lD.DebitType = 2 THEN lA.AmountCRY ELSE 0 END) / 2 AS recouvrement_a_reverser,
-        MAX(lA.loloanAllocationID)      AS last_allocation_id
+        l.LoanAmountCurrent        AS loan_amount,
+        r.Encours                  AS encours_au_moment_appel,
+        (CASE WHEN lD.DebitType = 2 THEN lA.AmountCRY ELSE 0 END)     AS total_remboursement_principale,
+        (CASE WHEN lD.DebitType = 2 THEN lA.AmountCRY ELSE 0 END) / 2 AS recouvrement_a_reverser,
+        (lA.loloanAllocationID)      AS last_allocation_id
     FROM solidis.dbo.Solidis_loan_update_monthly_reports r
     JOIN cbs.dbo.loLoan l               ON l.loLoanID          = r.loLoanID
     JOIN CBS.dbo.loloancredit lc        ON lc.loLoanId         = l.loLoanID
@@ -41,7 +41,7 @@ def _get_recouvrements(date_from: str, date_to: str) -> pd.DataFrame:
       AND lA.Date > r.reportDate
       AND lD.DebitType = 2
 	and la.Date BETWEEN '{dateFrom}' AND '{dateTo}'
-    GROUP BY r.IDCREDIT, r.loLoanID, l.AgreementNumber, l.AgreementDate
+    
     ORDER BY l.AgreementDate
     
     
