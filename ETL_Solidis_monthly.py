@@ -220,6 +220,20 @@ def getEngine():
     return engine
 
 
+def get_pyodbc_connection():
+    server = "172.20.24.37"
+    database = "solidis"
+    username = "Minonja"
+    password = "Minonja"
+    if platform.system() == "Linux":
+        driver = "ODBC Driver 17 for SQL Server"
+    else:
+        driver = "SQL Server"
+    return pyodbc.connect(
+        f"DRIVER={{{driver}}};SERVER={server};DATABASE={database};UID={username};PWD={password}"
+    )
+
+
 def upload_df_to_sftp(df: pd.DataFrame, remote_path: str, filename: str):
     """
     Uploads a Pandas DataFrame to an SFTP server as an Excel file.
@@ -287,9 +301,7 @@ def check_gender(genderKYC, CIN):
 
 
 def get_init_submition(datefrom, dateto):
-    con = pyodbc.connect(
-        "DRIVER={SQL Server};SERVER=172.20.24.37;DATABASE=solidis;UID=Minonja;PWD=Minonja"
-    )
+    con = get_pyodbc_connection()
     sql = """
     SELECT 
     	i.[ID CREDIT],i.[LOLOANID]
@@ -321,9 +333,7 @@ def get_emg_monthly(report_date):
     """EMG d'une seule date (nous demandons désormais les EMG date par date)."""
     #pour les prêts clôturé, l'encours (lb.PrincipalTotalCRY - lb.PrincipalPaidCRY - lb.PrincipalWoPaidCRY) =0. et pour les prêts clôturé il faut au moin déclaré une seule fois (la date de clôturé) que l'encours =0. pour que le prêt clôturé ne soit pas pris en compte dans la déclaration EMG.
     # courrige le query dans get_emg_monthly en ce sens
-    con = pyodbc.connect(
-        "DRIVER={SQL Server};SERVER=172.20.24.37;DATABASE=solidis;UID=Minonja;PWD=Minonja"
-    )
+    con = get_pyodbc_connection()
     sql = """
     DECLARE @reportDate DATE = '{}';
 
