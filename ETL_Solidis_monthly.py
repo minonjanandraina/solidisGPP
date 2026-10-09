@@ -336,40 +336,11 @@ def get_emg_monthly(report_date):
     con = get_pyodbc_connection()
     sql = """
     DECLARE @reportDate DATE = '{}';
-
-    WITH ActiveLoans AS (
-        SELECT l.loLoanID
-        FROM CBS.dbo.loLoan l
-        WHERE l.AgreementDate <= @reportDate
-          AND ISNULL(l.ClosingDate, @reportDate) >= @reportDate
-          AND EXISTS (
-              SELECT 1 FROM solidis.dbo.Solidis_f2_declared_v2 il
-              WHERE il.LOLOANID = l.loLoanID
-          )
-    ),
-    LatestBalance AS (
-        SELECT
-            lb.loLoanID,
-            lb.loLoanBalanceOndateId,
-            lb.[Date],
-            lb.DateValidTo,
-            lb.PrincipalTotalCRY,
-            lb.PrincipalPaidCRY,
-            lb.PrincipalWoPaidCRY,
-            lb.loStatus,
-            ROW_NUMBER() OVER (
-                PARTITION BY lb.loLoanID
-                ORDER BY lb.[Date] DESC,
-                         CASE WHEN lb.DateValidTo IS NULL THEN 0 ELSE 1 END,
-                         lb.DateValidTo DESC
-            ) AS rn
-        FROM CBS.dbo.loLoanBalanceOnDate lb
-        WHERE lb.[Date] <= @reportDate
-          AND EXISTS (SELECT 1 FROM ActiveLoans al WHERE al.loLoanID = lb.loLoanID)
-    )
-    SELECT
+ SELECT
         il.[ID CREDIT] AS [IDCREDIT],
         CAST(il.[N° CIN] AS VARCHAR) AS [CIN],
+		 
+
         lb.PrincipalTotalCRY - lb.PrincipalPaidCRY - lb.PrincipalWoPaidCRY AS Encours,
         CASE
             WHEN lb.loStatus = 13 THEN 0
@@ -387,16 +358,23 @@ def get_emg_monthly(report_date):
         lb.loStatus,
         l.loLoanID,
         @reportDate AS reportDate
-    FROM LatestBalance lb
+		
+    FROM CBS.dbo.loLoanBalanceOnDate lb
     JOIN CBS.dbo.loLoan l
         ON l.loLoanID = lb.loLoanID
     JOIN solidis.dbo.Solidis_f2_declared_v2 il
         ON il.LOLOANID = lb.loLoanID
-    LEFT JOIN [solidis].[dbo].[Solidis_loan_update_monthly_reports] re
-        ON re.loLoanID = il.LOLOANID AND re.Encours = 0 
-    WHERE lb.rn = 1
-      
-      AND re.loLoanID IS NULL and l.AgreementDate<= @reportDate;
+    
+    WHERE    @reportDate between lb.Date and ISNULL(lb.dateValidTo,@reportDate) and l.AgreementDate<= @reportDate 
+	and case 
+			when lb.PrincipalTotalCRY - lb.PrincipalPaidCRY - lb.PrincipalWoPaidCRY>0 then 1  -- dans le portefeuille si encours>0
+		else 
+			case 
+				when lb.PrincipalTotalCRY - lb.PrincipalPaidCRY - lb.PrincipalWoPaidCRY = 0 and l.closingDate = @reportDate  then 1 -- si encours = 0 et que la date rapport = date de cloture on a l'encours
+			else
+				0
+			end 
+		end = 1;
     """.format(report_date)
     df = pd.read_sql(sql, con)
 
@@ -727,6 +705,9 @@ def main(date_from, date_to):
         f2_case = "f2_bloque"
     else:
         df_init_submition = get_init_submition(date_from, date_to)
+        print('*' * 50)
+        print(f'Déclaration F2 : {len(df_init_submition)} entrée(s) initiales récupérée(s) pour la période {date_from} → {date_to}')
+        print('*' * 50)
         df_init_submition_to_send = generate_initial(df_init_submition, date_to)
         fn_f2 = generate_filename("PAMF_DIG F2 - monthly", date_to, "")
 
@@ -805,7 +786,7 @@ if __name__ == "__main__":
     check_system()
     # Example usage: main('2026-02-01', '2026-02-28')
     list_of_date_from_and_date_to = [
-        ("2026-06-01", "2026-06-30"),
+        ("2026-09-01", "2026-09-30"),
     ]
     for start_str_date, end_str_date in list_of_date_from_and_date_to:
 
