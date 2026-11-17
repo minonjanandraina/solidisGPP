@@ -535,12 +535,19 @@ def get_encours_reference(date_from):
     """Encours total (toutes lignes) à la dernière reportDate connue avant date_from — sert de référence au gating F2."""
     engine = getEngine()
     sql = """
-    SELECT SUM(Encours) AS encours
-    FROM [solidis].[dbo].[Solidis_loan_update_monthly_reports]
-    WHERE reportDate = (
+    SELECT SUM(r.Encours) AS encours
+    FROM [solidis].[dbo].[Solidis_loan_update_monthly_reports] r
+    WHERE r.reportDate = (
         SELECT MAX(reportDate)
         FROM [solidis].[dbo].[Solidis_loan_update_monthly_reports]
         WHERE reportDate < '{date_from}'
+    )
+    -- exclut les prêts déjà remboursés par SOLIDIS (appel de garantie au statut 'rembourse')
+    AND NOT EXISTS (
+        SELECT 1
+        FROM [solidis].[dbo].[garantie_clientsituation] cs
+        JOIN [solidis].[dbo].[garantie_processeappeldegarantie] p ON p.id = cs.process_id
+        WHERE p.statut = 'rembourse' AND cs.lo_loan_id = r.loLoanID
     )
     """.format(date_from=date_from)
     df = pd.read_sql(sql, engine)
@@ -561,6 +568,8 @@ def build_f2_daily_states(date_from, date_to, df_emg, config):
     Retourne (states, f2_bloque_fin_periode) où states est un dict {date: bool bloqué}.
     """
     plafond = config["plafond_emg"]
+    #soustraire ici la somme de tous les prêts avec appel de garantié remboursé
+    
     seuil_reprise = plafond * config["seuil_reprise_pct"]
     bloque = config["f2_bloque"]
 
@@ -578,6 +587,8 @@ def build_f2_daily_states(date_from, date_to, df_emg, config):
     states = {}
     current_day = date_from_d
     while current_day <= date_to_d:
+        
+        print(f"Date: {current_day}, Encours précédent: {encours_prev}, Plafond: {plafond}, Seuil reprise: {seuil_reprise}, Bloqué: {bloque}")
         if encours_prev is not None:
             if not bloque and encours_prev > plafond:
                 bloque = True
